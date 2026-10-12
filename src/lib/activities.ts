@@ -1,4 +1,5 @@
 // Activités hors séance (vélo, running, escalade…) : type, durée et distance lus dans le texte.
+// Le type est une clé neutre ; son libellé vient de la langue de l'interface.
 
 export interface Activity {
   id: string;
@@ -9,23 +10,31 @@ export interface Activity {
 }
 
 export const ACTIVITY_TYPES = [
-  "Vélotaf", "Vélo", "Gravel", "Running", "Rando", "Escalade", "Yoga",
-  "Mobilité", "Corde", "HIIT", "Handstand", "Marche", "Autre",
-];
+  "commute", "bike", "gravel", "run", "hike", "climb", "yoga",
+  "mobility", "rope", "hiit", "handstand", "walk", "other",
+] as const;
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
-const TYPES: [RegExp, string][] = [
-  [/v[ée]lo\s*-?\s*taf|v[ée]lotaf/i, "Vélotaf"],
-  [/gravel/i, "Gravel"],
-  [/v[ée]lo|bike|cyclisme/i, "Vélo"],
-  [/running|footing|jogging|course à pied|\brun\b/i, "Running"],
-  [/\brando|randonn/i, "Rando"],
-  [/escalade|grimpe/i, "Escalade"],
-  [/yoga/i, "Yoga"],
-  [/mobilit|[ée]tirement|stretching|souplesse/i, "Mobilité"],
-  [/corde/i, "Corde"],
-  [/hiit|tabata|emom/i, "HIIT"],
-  [/handstand/i, "Handstand"],
-  [/marche|balade/i, "Marche"],
+/** Anciennes sauvegardes : types stockés en libellé français. */
+export const LEGACY_TYPES: Record<string, ActivityType> = {
+  "Vélotaf": "commute", "Vélo": "bike", "Gravel": "gravel", "Running": "run", "Rando": "hike",
+  "Escalade": "climb", "Yoga": "yoga", "Mobilité": "mobility", "Corde": "rope", "HIIT": "hiit",
+  "Handstand": "handstand", "Marche": "walk", "Autre": "other",
+};
+
+const TYPES: [RegExp, ActivityType][] = [
+  [/v[ée]lo\s*-?\s*taf|v[ée]lotaf|\bcommute|bike to work/i, "commute"],
+  [/gravel/i, "gravel"],
+  [/v[ée]lo|bike|cycling|\bride\b|cyclisme/i, "bike"],
+  [/running|footing|jogging|\bjog\b|course à pied|\brun\b/i, "run"],
+  [/\brando|randonn|\bhike|hiking/i, "hike"],
+  [/escalade|grimpe|climb|boulder/i, "climb"],
+  [/yoga/i, "yoga"],
+  [/mobilit|[ée]tirement|stretch|souplesse/i, "mobility"],
+  [/corde|jump rope|skipping/i, "rope"],
+  [/hiit|tabata|emom/i, "hiit"],
+  [/handstand/i, "handstand"],
+  [/marche|balade|\bwalk/i, "walk"],
 ];
 
 /** Le texte décrit-il une activité (et pas une série d'exercice) ? */
@@ -34,9 +43,9 @@ export function looksLikeActivity(text: string): boolean {
   return TYPES.some(([re]) => re.test(text));
 }
 
-export function detectType(text: string): string {
+export function detectType(text: string): ActivityType {
   for (const [re, type] of TYPES) if (re.test(text)) return type;
-  return "Autre";
+  return "other";
 }
 
 export function parseDistanceKm(text: string): number | undefined {
@@ -49,9 +58,9 @@ export function parseDistanceKm(text: string): number | undefined {
 export function parseDurationMin(text: string): number | undefined {
   const hm = text.match(/(\d+)\s*h\s*(\d{1,2})?(?!\w)/i);
   if (hm) return parseInt(hm[1], 10) * 60 + (hm[2] ? parseInt(hm[2], 10) : 0);
-  const heure = text.match(/(\d+)\s*heures?/i);
+  const heure = text.match(/(\d+)\s*(?:heures?|hours?|hrs?)\b/i);
   if (heure) return parseInt(heure[1], 10) * 60;
-  const min = text.match(/(\d+)\s*(?:min|minutes?|mn)\b/i);
+  const min = text.match(/(\d+)\s*(?:min|minutes?|mn|mins)\b/i);
   return min ? parseInt(min[1], 10) : undefined;
 }
 
@@ -75,4 +84,5 @@ export function paceLabel(durationMin?: number, distanceKm?: number): string | n
   return s === 60 ? `${m + 1}:00/km` : `${m}:${String(s).padStart(2, "0")}/km`;
 }
 
-export const isCycling = (type: string) => /v[ée]lo|gravel/i.test(type);
+export const isCycling = (type: string) => type === "bike" || type === "gravel" || type === "commute";
+export const isPaced = (type: string) => type === "run" || type === "hike" || type === "walk";

@@ -53,8 +53,8 @@ describe("activités", () => {
     expect(parseDistanceKm("Vélotaf 2x4 km")).toBe(8);
     expect(parseDurationMin("1h20 de gravel")).toBe(80);
     expect(parseDurationMin("Running 21 minutes / 3km")).toBe(21);
-    expect(detectType("1h20 de gravel")).toBe("Gravel");
-    expect(detectType("Escalade en bloc 1 heure")).toBe("Escalade");
+    expect(detectType("1h20 de gravel")).toBe("gravel");
+    expect(detectType("Escalade en bloc 1 heure")).toBe("climb");
   });
 });
 
@@ -87,11 +87,11 @@ Note : séance moyenne.
     expect(lun.date).toBe("2026-10-05");
     expect(lun.title).toBe("Haut du corps + front lever (fort)");
     expect(lun.lines).toHaveLength(2);
-    expect(lun.activities.map((a) => a.type)).toEqual(["Vélo", "Yoga"]);
+    expect(lun.activities.map((a) => a.type)).toEqual(["bike", "yoga"]);
     expect(lun.note).toContain("dernière série en tuck");
     expect(lun.note).toContain("séance moyenne");
     expect(mar.lines).toHaveLength(0);
-    expect(mar.activities.map((a) => a.type)).toEqual(["Running", "Handstand"]);
+    expect(mar.activities.map((a) => a.type)).toEqual(["run", "handstand"]);
   });
 
   it("lit l'ancien format avec objectif puis valeurs", () => {
@@ -145,7 +145,7 @@ Bonus : 1h20 de gravel à la fin de la journée`;
     const s = createSession("2026-10-12", null, "manual");
     s.title = "Pull";
     s.lines = ["Tractions 4x [8-10] : 10,10,8,7"];
-    s.activities = [{ id: "a", type: "Vélotaf", label: "Vélotaf 2x4 km", distanceKm: 8 }];
+    s.activities = [{ id: "a", type: "commute", label: "Vélotaf 2x4 km", distanceKm: 8 }];
     s.note = "Dernier bloc non fait.";
     data.sessions.push(s);
     const r = parseImport(weekMarkdown(data, "2026-10-12"), id, today);
@@ -160,13 +160,13 @@ describe("parseProgram", () => {
   const settings = { defaultRest: 90, skillRest: 150 };
 
   it("lit le programme d'exemple", () => {
-    const { templates, warnings } = parseProgram(EXAMPLE_PROGRAM, settings);
+    const { templates, warnings } = parseProgram(EXAMPLE_PROGRAM.fr, settings);
     expect(warnings).toEqual([]);
     expect(templates.map((t) => t.weekday)).toEqual([0, 1, 2, 4, null]);
     const lun = templates[0];
     expect(lun.title).toBe("Haut du corps");
     expect(lun.blocks[0]).toMatchObject({ kind: "skill", sets: 3, rest: 150 });
-    expect(lun.blocks[1]).toMatchObject({ kind: "superset", tag: "noyau", sets: 4, rest: 90 });
+    expect(lun.blocks[1]).toMatchObject({ kind: "superset", tag: "core", sets: 4, rest: 90 });
     expect(lun.blocks[2].tag).toBe("bonus");
     const mar = templates[1];
     expect(mar.blocks).toHaveLength(2);
@@ -183,7 +183,7 @@ describe("parseProgram", () => {
   });
 
   it("produit des lignes au format carnet", () => {
-    const { templates } = parseProgram(EXAMPLE_PROGRAM, settings);
+    const { templates } = parseProgram(EXAMPLE_PROGRAM.fr, settings);
     const s = createSession("2026-10-12", templates[0]);
     s.blocks[1].values = ["8/15", "7/14"];
     expect(sessionLines(s)).toEqual(["Tractions / Pompes 4x [6-8 / 12-15] : 8/15, 7/14"]);
@@ -203,5 +203,87 @@ describe("buildPrompt", () => {
     expect(p).toContain("- Tractions : 05/10 4x [5-6] 6,5,4,4 · 12/10 4x [5-6] 6,6,5,5");
     expect(p).toContain("## Semaine du 12/10");
     expect(p).not.toContain("## Programme");
+  });
+});
+
+describe("anglais", () => {
+  const today = "2026-10-12";
+
+  it("lit des notes en anglais", () => {
+    const text = `# Week of 05/10
+
+## Mon 05/10 — Upper body
+* Pull-ups +12kg 4x [5-6] : 6,5,4,4
+* Front lever one-leg 5x [8-12s] : L 12s, R 12s, L11s
+Other:
+- bike 7km
+- yoga 15 minutes
+Note: a bit tired.
+
+## Tuesday 06/10
+- Running 5 km in 28 min
+Extra: 1h30 bouldering`;
+    const r = parseImport(text, id, today);
+    expect(r.warnings).toEqual([]);
+    const [mon, tue] = r.days;
+    expect(mon.date).toBe("2026-10-05");
+    expect(mon.title).toBe("Upper body");
+    expect(mon.activities.map((a) => a.type)).toEqual(["bike", "yoga"]);
+    expect(mon.activities[1].durationMin).toBe(15);
+    expect(mon.note).toBe("a bit tired.");
+    expect(parseLine(mon.lines[1])!.values.map((v) => v.side)).toEqual(["L", "R", "L"]);
+    expect(tue.date).toBe("2026-10-06");
+    expect(tue.activities.map((a) => [a.type, a.distanceKm, a.durationMin])).toEqual([["run", 5, 28], ["climb", undefined, 90]]);
+  });
+
+  it("lit l'ancien format avec « Target »", () => {
+    const r = parseImport("Week of 14/09\nMonday 14\n4x Pull-ups 12kg : Target 4-6 reps\n- 6,5,5,4", id, today);
+    expect(r.days[0].lines).toEqual(["Pull-ups 12kg 4x [4-6] : 6,5,5,4"]);
+  });
+
+  it("relit son export Markdown anglais", () => {
+    const data = migrate({});
+    const s = createSession("2026-10-12", null, "manual");
+    s.lines = ["Pull-ups 4x [8-10] : 10,10,8,7"];
+    s.activities = [{ id: "a", type: "commute", label: "Bike commute 2x5 km", distanceKm: 10 }];
+    s.note = "Good one.";
+    data.sessions.push(s);
+    const md = weekMarkdown(data, "2026-10-12", "en");
+    expect(md).toContain("# Week of 12/10");
+    expect(md).toContain("## Mon 12/10");
+    expect(md).toContain("Other:");
+    const r = parseImport(md, id, today);
+    expect(r.days[0].lines).toEqual(s.lines);
+    expect(r.days[0].activities[0].type).toBe("commute");
+    expect(r.days[0].note).toBe("Good one.");
+  });
+
+  it("lit le programme d'exemple anglais", () => {
+    const { templates, warnings } = parseProgram(EXAMPLE_PROGRAM.en, { defaultRest: 90, skillRest: 150 });
+    expect(warnings).toEqual([]);
+    expect(templates.map((t) => t.weekday)).toEqual([0, 1, 2, 4, null]);
+    expect(templates[0].blocks[0]).toMatchObject({ kind: "skill", rest: 150 });
+    expect(templates[0].blocks[1]).toMatchObject({ kind: "superset", tag: "core", sets: 4, rest: 90 });
+    expect(templates[0].blocks[1].label).toBe("Superset A");
+    expect(templates[0].blocks[2].tag).toBe("bonus");
+    expect(placeholderFor({ exos: [{ name: "a", target: "8-10 / leg" }] })).toBe("10");
+  });
+
+  it("prompt en anglais", () => {
+    const data = migrate({ context: "Test context." });
+    const s = createSession("2026-10-12", null, "manual");
+    s.lines = ["Pull-ups 4x [5-6] : 6,6,5,5"];
+    data.sessions.push(s);
+    const p = buildPrompt(data, { monday: "2026-10-12", context: true, program: false, trends: true, week: true, question: "Review.", lang: "en" });
+    expect(p).toContain("## Context\nTest context.");
+    expect(p).toContain("## Week of 12/10");
+    expect(p).toContain("## Request\nReview.");
+  });
+
+  it("convertit les anciennes sauvegardes", () => {
+    const d = migrate({ sessions: [{ id: "x", date: "2026-10-01", activities: [{ id: "a", type: "Vélotaf", label: "Vélotaf 8 km" }], blocks: [{ id: "b", tag: "noyau", exos: [], values: [] }] }] });
+    expect(d.sessions[0].activities[0].type).toBe("commute");
+    expect(d.sessions[0].blocks[0].tag).toBe("core");
+    expect(d.settings.lang).toBe("auto");
   });
 });

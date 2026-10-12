@@ -1,16 +1,16 @@
 // Import de masse : texte libre au format carnet (Markdown) → journées de séance.
+// Les repères sont compris en français et en anglais, quelle que soit la langue de l'interface.
 //
-// Reconnu :
-//   # Semaine du 05/10            (contexte d'année et de semaine, facultatif)
-//   ## Lun 05/10 — Titre          (aussi "Lun 21/09 :", "Mardi 15", "2/ Mardi 15")
+//   # Semaine du 05/10  |  # Week of 05/10          (contexte d'année et de semaine, facultatif)
+//   ## Lun 05/10 — Titre  |  ## Mon 05/10 — Title   (aussi "Lun 21/09 :", "Mardi 15", "2/ Tuesday 15")
 //   * Exercice 4x [5-6] : 6,5,4,4
 //   4x Tractions 12kg : Objectif 4-6 reps   suivi de   - 6,5,5,4
-//   Autre :  - vélo 7km           (activités)
+//   Autre : / Other:   - vélo 7km               (activités)
 //   Note : texte libre
 // Le reste d'une journée devient une note ; le texte hors journée est ignoré.
 
 import { type Activity, activityFromText, looksLikeActivity } from "./activities";
-import { addDays, dayIndexFromName, fromISO, isValidISO, toISO, todayISO, weekday } from "./dates";
+import { addDays, DAY_NAME_PATTERN, dayIndexFromName, fromISO, isValidISO, toISO, todayISO, weekday } from "./dates";
 
 export interface ImportedDay {
   date: string;
@@ -18,24 +18,33 @@ export interface ImportedDay {
   lines: string[];
   activities: Activity[];
   note: string;
-  warnings: string[];
+  warnings: ImportWarning[];
 }
+
+export type ImportWarning =
+  | { kind: "incomplete"; line: string; day: number }
+  | { kind: "weekday"; day: number; month: number; name: string };
 
 export interface ImportResult {
   days: ImportedDay[];
   ignoredLines: number;
-  warnings: string[];
+  warnings: ImportWarning[];
 }
 
-const DAY_RE =
-  /^(?:#{1,6}\s*)?(?:\d+\s*[/.)]\s*)?(lun(?:di)?|mar(?:di)?|mer(?:credi)?|jeu(?:di)?|ven(?:dredi)?|sam(?:edi)?|dim(?:anche)?)\.?\s+(\d{1,2})(?:\s*[/.]\s*(\d{1,2})(?:\s*[/.]\s*(\d{2,4}))?)?(?!\d)\s*(?:[—–:-]+\s*(.*))?$/i;
-const WEEK_RE = /\bsemaine\s+(?:du\s+)?(\d{1,2})\s*[/.]\s*(\d{1,2})(?:\s*[/.]\s*(\d{2,4}))?/i;
-const WEEK_COMPACT_RE = /\bsemaine\s+(\d{2})(\d{2})\b/i;
+const DAY_RE = new RegExp(
+  String.raw`^(?:#{1,6}\s*)?(?:\d+\s*[/.)]\s*)?(${DAY_NAME_PATTERN})\.?\s+(\d{1,2})(?:\s*[/.]\s*(\d{1,2})(?:\s*[/.]\s*(\d{2,4}))?)?(?!\d)\s*(?:[—–:-]+\s*(.*))?$`,
+  "i",
+);
+const WEEK_RE = /\b(?:semaine\s+(?:du\s+)?|week\s+(?:of\s+)?)(\d{1,2})\s*[/.]\s*(\d{1,2})(?:\s*[/.]\s*(\d{2,4}))?/i;
+const WEEK_COMPACT_RE = /\b(?:semaine|week)\s+(\d{2})(\d{2})\b/i;
 const BULLET_RE = /^\s*(?:[*\-•]|\d+[.)])\s+(.*)$/;
-const OLD_HEADER_RE = /^(\d+)\s*[x×]\s+(.+?)\s*:\s*objectifs?\s*:?\s*(.+)$/i;
-const VALUES_ONLY_RE = /^(?=.*\d)[\dDG\s,;./s]+$/;
+const OLD_HEADER_RE = /^(\d+)\s*[x×]\s+(.+?)\s*:\s*(?:objectifs?|targets?|goals?)\s*:?\s*(.+)$/i;
+const VALUES_ONLY_RE = /^(?=.*\d)[\dDGRL\s,;./s]+$/;
+const OTHER_RE = /^(?:autres?|others?)\s*:\s*(.*)$/i;
+const NOTE_RE = /^notes?\s*:\s*(.*)$/i;
+const EXTRA_RE = /^(?:bonus|extra|en compl[ée]ment[^:]*|also)\s*:\s*(.+)$/i;
 
-const looksLikeExercise = (t: string) => /\[[^\]]*\]/.test(t) || /:\s*[DG]?\s*\d/.test(t) || /(?:^|\s)\d+\s*[x×]\s/.test(t);
+const looksLikeExercise = (t: string) => /\[[^\]]*\]/.test(t) || /:\s*[DGRL]?\s*\d/.test(t) || /(?:^|\s)\d+\s*[x×]\s/.test(t);
 
 function fullYear(y: string): number {
   const n = parseInt(y, 10);
@@ -58,8 +67,8 @@ function makeISO(day: number, month: number, year: number): string | null {
 
 function cleanObjective(obj: string): string {
   return obj
-    .replace(/\s*\b(?:reps?|répétitions?)\b/gi, "")
-    .replace(/\s*\b(?:secondes?|secs?)\b/gi, "s")
+    .replace(/\s*\b(?:reps?|répétitions?|repetitions?)\b/gi, "")
+    .replace(/\s*\b(?:secondes?|seconds?|secs?)\b/gi, "s")
     .trim();
 }
 
@@ -116,13 +125,13 @@ export function parseImport(text: string, newId: () => string, today = todayISO(
         }
       }
       if (!iso) {
-        result.warnings.push(`« ${line} » : date incomplète, journée ignorée (ajoute le mois, ex. ${d}/10).`);
+        result.warnings.push({ kind: "incomplete", line, day: d });
         day = null;
         continue;
       }
       day = { date: iso, title: (dm[5] ?? "").trim(), lines: [], activities: [], note: "", warnings: [] };
       if (named !== null && named !== weekday(iso)) {
-        day.warnings.push(`Le ${d}/${fromISO(iso).getMonth() + 1} n'est pas un ${dm[1].toLowerCase()} : la date est conservée.`);
+        day.warnings.push({ kind: "weekday", day: d, month: fromISO(iso).getMonth() + 1, name: dm[1].toLowerCase() });
       }
       result.days.push(day);
       section = "main";
@@ -152,19 +161,19 @@ export function parseImport(text: string, newId: () => string, today = todayISO(
       continue;
     }
 
-    const autre = line.match(/^autres?\s*:\s*(.*)$/i);
+    const autre = line.match(OTHER_RE);
     if (autre) {
       section = "autre";
       if (autre[1]) addActivity(autre[1]);
       continue;
     }
-    const note = line.match(/^notes?\s*:\s*(.*)$/i);
+    const note = line.match(NOTE_RE);
     if (note) {
       section = "note";
       addNote(note[1].trim());
       continue;
     }
-    const extra = line.match(/^(?:bonus|en compl[ée]ment[^:]*)\s*:\s*(.+)$/i);
+    const extra = line.match(EXTRA_RE);
     if (extra) {
       if (looksLikeExercise(extra[1]) && !looksLikeActivity(extra[1])) addEntry(extra[1]);
       else addActivity(extra[1]);

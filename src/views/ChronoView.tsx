@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Nav } from "../App";
-import { fmtClock, todayISO, dayLabel } from "../lib/dates";
+import { dayLabel, fmtClock, todayISO } from "../lib/dates";
 import { keepScreenOn, toast, unlockAudio } from "../lib/device";
+import { type Dict, useT } from "../lib/i18n";
 import { addActivityTo } from "../lib/sessions";
 import { uid, update } from "../lib/store";
 import {
@@ -11,19 +12,21 @@ import {
 
 const R = 100;
 const C = 2 * Math.PI * R;
-const PHASE_LABEL: Record<string, string> = { prep: "PRÉPARATION", work: "TRAVAIL", rest: "REPOS", done: "TERMINÉ", idle: "PRÊT", running: "EN COURS", paused: "PAUSE" };
 
-function presetLine(p: Preset) {
-  if (p.stopwatch) return "temps libre";
+const presetName = (t: Dict, p: Preset) => t.chrono.presets[p.id] ?? p.name;
+
+function presetLine(t: Dict, p: Preset) {
+  if (p.stopwatch) return t.chrono.freeTime;
   return `${p.work}/${p.rest} ×${p.rounds} · ${fmtClock(presetTotal(p))}`;
 }
 
 export default function ChronoView({ nav }: { nav: Nav }) {
   useTimers();
+  const t = useT();
   const p = chrono.preset;
   const [custom, setCustom] = useState({ work: "45", rest: "15", rounds: "6" });
 
-  let phase = chrono.phase;
+  const phase = chrono.phase;
   let time = "0:00";
   let sub = "";
   let progress = 1;
@@ -34,22 +37,23 @@ export default function ChronoView({ nav }: { nav: Nav }) {
     progress = ((ms / 1000) % 60) / 60;
   } else if (phase === "idle") {
     time = fmtClock(p.work);
-    sub = `${p.rounds} tours · ${fmtClock(presetTotal(p))}`;
+    sub = `${t.chrono.rounds(p.rounds)} · ${fmtClock(presetTotal(p))}`;
   } else if (phase === "done") {
     time = fmtClock(presetTotal(p));
-    sub = `${p.rounds} tours`;
+    sub = t.chrono.rounds(p.rounds);
   } else {
     const left = Math.max(0, phaseLeft());
     const dur = phase === "prep" ? PREP_SECONDS : phase === "work" ? p.work : p.rest;
     time = fmtClock(left);
-    sub = `Tour ${chrono.round}/${p.rounds}`;
+    sub = t.chrono.round(chrono.round, p.rounds);
     progress = left / dur;
   }
   const paused = chrono.pausedLeft !== null || phase === "paused";
   const ringClass = phase === "work" || phase === "running" ? "work" : phase === "rest" ? "rest" : "";
   const startLabel = p.stopwatch
-    ? phase === "running" ? "Pause" : phase === "paused" ? "Reprendre" : "Démarrer"
-    : phase === "idle" ? "Démarrer" : phase === "done" ? "Recommencer" : paused ? "Reprendre" : "Pause";
+    ? phase === "running" ? t.chrono.pause : phase === "paused" ? t.chrono.resume : t.chrono.start
+    : phase === "idle" ? t.chrono.start : phase === "done" ? t.chrono.restart : paused ? t.chrono.resume : t.chrono.pause;
+  const phaseText = t.chrono.phases[phase] + (paused && !p.stopwatch && phase !== "idle" && phase !== "done" ? t.chrono.pausedSuffix : "");
 
   const applyCustom = (next: typeof custom) => {
     setCustom(next);
@@ -62,23 +66,23 @@ export default function ChronoView({ nav }: { nav: Nav }) {
   const save = () => {
     const today = todayISO();
     let label: string;
-    let type = "HIIT";
+    let type = "hiit";
     let durationMin: number | undefined;
     if (p.stopwatch) {
       const s = Math.floor(stopwatchMs() / 1000);
-      if (!s) { toast("Le chronomètre est à zéro."); return; }
-      label = `Chronomètre ${fmtClock(s)}`;
-      type = "Autre";
+      if (!s) { toast(t.chrono.zero); return; }
+      label = t.chrono.stopwatchLabel(fmtClock(s));
+      type = "other";
       durationMin = Math.round(s / 60);
     } else {
       const done = completedRounds();
-      if (!done) { toast("Aucun tour terminé pour l'instant."); return; }
-      if (p.id === "corde") type = "Corde";
-      label = `${p.name.replace(/\s\d+\/\d+$/, "")} ${p.work}/${p.rest} ×${done}${done < p.rounds ? ` (sur ${p.rounds})` : ""}`;
+      if (!done) { toast(t.chrono.noRound); return; }
+      if (p.id === "corde") type = "rope";
+      label = `${presetName(t, p).replace(/\s\d+\/\d+$/, "")} ${p.work}/${p.rest} ×${done}${done < p.rounds ? ` ${t.chrono.outOf(p.rounds)}` : ""}`;
       durationMin = Math.round((done * p.work + Math.max(0, done - 1) * p.rest) / 60);
     }
     update((d) => addActivityTo(d, today, { id: uid(), type, label, durationMin }));
-    toast(`Ajouté à ${dayLabel(today)}.`);
+    toast(t.chrono.addedTo(dayLabel(today, t.lang)));
   };
 
   return (
@@ -86,9 +90,9 @@ export default function ChronoView({ nav }: { nav: Nav }) {
       <div className="presets">
         {PRESETS.map((x) => (
           <button key={x.id} type="button" className="preset" aria-pressed={x.id === p.id} onClick={() => (x.custom ? applyCustom(custom) : selectPreset(x))}>
-            <b>{x.name}</b>
-            <span className="mono">{x.custom && p.custom ? presetLine(p) : presetLine(x)}</span>
-            {x.note && <span className="small">{x.note}</span>}
+            <b>{presetName(t, x)}</b>
+            <span className="mono">{x.custom && p.custom ? presetLine(t, p) : presetLine(t, x)}</span>
+            {x.id === "emom" && <span className="small">{t.chrono.emomNote}</span>}
           </button>
         ))}
       </div>
@@ -97,7 +101,7 @@ export default function ChronoView({ nav }: { nav: Nav }) {
         <div className="card">
           <div className="grid3">
             {(["work", "rest", "rounds"] as const).map((k) => (
-              <label key={k} className="lbl" htmlFor={`c-${k}`}>{k === "work" ? "Travail (s)" : k === "rest" ? "Repos (s)" : "Tours"}
+              <label key={k} className="lbl" htmlFor={`c-${k}`}>{k === "work" ? t.chrono.work : k === "rest" ? t.chrono.restS : t.chrono.roundsLabel}
                 <input className="field mono" id={`c-${k}`} inputMode="numeric" value={custom[k]} onChange={(e) => applyCustom({ ...custom, [k]: e.target.value })} />
               </label>
             ))}
@@ -106,21 +110,21 @@ export default function ChronoView({ nav }: { nav: Nav }) {
       )}
 
       <div className="card ring-wrap">
-        <svg className={`ring ${ringClass}`} viewBox="0 0 240 240" role="timer" aria-label={`${PHASE_LABEL[phase]} ${time}`}>
+        <svg className={`ring ${ringClass}`} viewBox="0 0 240 240" role="timer" aria-label={`${phaseText} ${time}`}>
           <circle className="bg" cx="120" cy="120" r={R} fill="none" strokeWidth="12" />
           <circle className="fg" cx="120" cy="120" r={R} fill="none" strokeWidth="12" strokeLinecap="round"
             strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - progress)).toFixed(1)} transform="rotate(-90 120 120)" />
-          <text className="phase" x="120" y="86" textAnchor="middle">{PHASE_LABEL[phase]}{paused && !p.stopwatch && phase !== "idle" && phase !== "done" ? " · PAUSE" : ""}</text>
+          <text className="phase" x="120" y="86" textAnchor="middle">{phaseText}</text>
           <text className="big" x="120" y="136" textAnchor="middle">{time}</text>
           <text className="sub" x="120" y="166" textAnchor="middle">{sub}</text>
         </svg>
         <div className="row center">
           <button type="button" className="btn primary" onClick={() => { unlockAudio(); void keepScreenOn(); toggleChrono(); }}>{startLabel}</button>
-          <button type="button" className="btn" onClick={resetChrono}>Réinitialiser</button>
-          <button type="button" className="btn" onClick={save}>Ajouter à aujourd'hui</button>
+          <button type="button" className="btn" onClick={resetChrono}>{t.chrono.reset}</button>
+          <button type="button" className="btn" onClick={save}>{t.chrono.addToday}</button>
         </div>
       </div>
-      <p className="small">Bips à 3, 2, 1 avant chaque changement de phase, vibration en fin de série quand l'appareil le permet. Le repos entre séries se lance depuis l'onglet <button type="button" className="linklike" onClick={() => nav.go("seance")}>Séance</button>.</p>
+      <p className="small">{t.chrono.help} <button type="button" className="linklike" onClick={() => nav.go("seance")}>{t.chrono.helpLink}</button>.</p>
     </div>
   );
 }

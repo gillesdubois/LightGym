@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { Nav } from "../App";
 import { ActivityLine, Chip, Confirm, LineView, useNow, useTemplates } from "../components/common";
-import { dayLabel, fmtClock, todayISO, weekday, DAY_LONG } from "../lib/dates";
+import { DAYS, dayLabel, fmtClock, todayISO, weekday } from "../lib/dates";
 import { beep, releaseScreen, toast, unlockAudio } from "../lib/device";
+import { useT } from "../lib/i18n";
 import { parseLine, parseTarget, parseValue } from "../lib/parse";
 import { placeholderFor } from "../lib/program";
 import { isEmpty } from "../lib/sessions";
@@ -15,6 +16,7 @@ export default function SessionView({ data, nav, session }: { data: Data; nav: N
 }
 
 function Picker({ data, nav }: { data: Data; nav: Nav }) {
+  const t = useT();
   const [date, setDate] = useState(todayISO());
   const { templates } = useTemplates(data);
   const wd = weekday(date);
@@ -22,36 +24,35 @@ function Picker({ data, nav }: { data: Data; nav: Nav }) {
   return (
     <div className="stack">
       <section className="card">
-        <h2 className="h2">Nouvelle séance</h2>
-        <label className="lbl" htmlFor="pick-date">Date
+        <h2 className="h2">{t.session.newTitle}</h2>
+        <label className="lbl" htmlFor="pick-date">{t.session.date}
           <input className="field" id="pick-date" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </label>
-        <button type="button" className="btn primary" onClick={() => nav.startSession(date, null)}>Séance libre</button>
+        <button type="button" className="btn primary" onClick={() => nav.startSession(date, null)}>{t.session.freeSession}</button>
       </section>
       {sorted.length > 0 && (
         <section className="card">
-          <span className="blk-label">Depuis le programme</span>
+          <span className="blk-label">{t.session.fromProgram}</span>
           <div className="tpl-list">
-            {sorted.map((t) => (
-              <button key={t.id} type="button" className="tpl" onClick={() => nav.startSession(date, t)}>
+            {sorted.map((x) => (
+              <button key={x.id} type="button" className="tpl" onClick={() => nav.startSession(date, x)}>
                 <span>
-                  <b>{t.title}</b>
-                  <span className="small">{t.blocks.map((b) => b.exos.map((e) => e.name).join(" / ")).join(" · ")}</span>
+                  <b>{x.title}</b>
+                  <span className="small">{x.blocks.map((b) => b.exos.map((e) => e.name).join(" / ")).join(" · ")}</span>
                 </span>
-                <span className="mono small">{t.weekday !== null ? DAY_LONG[t.weekday] : "libre"}</span>
+                <span className="mono small">{x.weekday !== null ? DAYS[t.lang].long[x.weekday] : t.session.anyDay}</span>
               </button>
             ))}
           </div>
         </section>
       )}
-      {!templates.length && (
-        <p className="small">Aucun programme enregistré. Les gabarits apparaissent ici après avoir écrit ton programme dans Outils.</p>
-      )}
+      {!templates.length && <p className="small">{t.session.noProgram}</p>}
     </div>
   );
 }
 
 function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
+  const t = useT();
   const live = s.status === "live";
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [hold, setHold] = useState<{ blockId: string; start: number } | null>(null);
@@ -73,13 +74,13 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
     const b = s.blocks.find((x) => x.id === blockId)!;
     const val = (inputs[blockId] ?? "").trim() || placeholderFor(b);
     if (!val) {
-      toast("Saisis une valeur pour cette série.");
+      toast(t.session.needValue);
       return;
     }
     patch((x) => x.blocks.find((y) => y.id === blockId)!.values.push(val));
     setInputs((m) => ({ ...m, [blockId]: "" }));
     const count = b.values.length + 1;
-    if (count >= b.sets) toast(`${b.label} : ${count}/${b.sets} séries.`);
+    if (count >= b.sets) toast(t.session.blockCount(b.label, count, b.sets));
     else if (b.rest > 0) startRest(b.rest);
   };
 
@@ -90,7 +91,7 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
       setHold(null);
       setInputs((m) => ({ ...m, [blockId]: `${secs}s` }));
       beep(880, 0.15);
-      toast(`Hold de ${secs} s. Ajoute D ou G si besoin, puis valide la série.`);
+      toast(t.session.holdDone(secs));
     } else {
       setHold({ blockId, start: Date.now() + 3000 });
       beep(660, 0.1);
@@ -98,15 +99,15 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
   };
 
   const finish = () => {
-    patch((x) => { x.status = "done"; });
     update((d) => {
       const x = d.sessions.find((y) => y.id === s.id);
+      if (x) x.status = "done";
       if (x && isEmpty(x)) d.sessions = d.sessions.filter((y) => y.id !== s.id);
       d.activeId = null;
     });
     stopRest();
     releaseScreen();
-    toast("Séance enregistrée.");
+    toast(t.session.finished);
     nav.go("semaine");
   };
 
@@ -121,41 +122,41 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
     <div className="stack">
       <section className="card">
         <div className="grid2">
-          <label className="lbl" htmlFor="s-title">Titre
-            <input className="field" id="s-title" value={s.title} placeholder="Séance libre" onChange={(e) => patch((x) => { x.title = e.target.value; })} />
+          <label className="lbl" htmlFor="s-title">{t.session.title}
+            <input className="field" id="s-title" value={s.title} placeholder={t.session.titlePh} onChange={(e) => patch((x) => { x.title = e.target.value; })} />
           </label>
-          <label className="lbl" htmlFor="s-date">Date
+          <label className="lbl" htmlFor="s-date">{t.session.date}
             <input className="field" id="s-date" type="date" value={s.date} onChange={(e) => e.target.value && patch((x) => { x.date = e.target.value; })} />
           </label>
         </div>
         {live && s.startedAt && s.date === todayISO() ? (
           <>
             <div className="row between">
-              <span className="mono">{fmtClock(elapsed)} écoulées</span>
-              <span className="small">objectif {data.settings.targetMinutes} min</span>
+              <span className="mono">{t.session.elapsed(fmtClock(elapsed))}</span>
+              <span className="small">{t.session.target(data.settings.targetMinutes)}</span>
             </div>
             <div className="progress"><i style={{ width: `${Math.min(100, (elapsed / target) * 100)}%`, background: elapsed > target ? "var(--work)" : undefined }} /></div>
           </>
         ) : (
-          <span className="small">{live ? "En cours" : `Enregistrée · ${dayLabel(s.date)}`}</span>
+          <span className="small">{live ? t.session.inProgress : t.session.saved(dayLabel(s.date, t.lang))}</span>
         )}
       </section>
 
       {s.blocks.map((b) => {
-        const t = b.kind === "skill" || b.exos.length === 1 ? parseTarget(b.exos[0]?.target) : null;
+        const target1 = b.kind === "skill" || b.exos.length === 1 ? parseTarget(b.exos[0]?.target) : null;
         const ph = placeholderFor(b);
         const holdable = b.exos.length === 1 && /\d\s*s\b|sec/i.test(b.exos[0].target);
         const holdLeft = hold?.blockId === b.id ? (now - hold.start) / 1000 : null;
         return (
           <section key={b.id} className={`card blk ${b.skipped ? "skipped" : ""}`}>
             <div className="row between">
-              <span className="blk-label">{b.label}{b.rest ? ` · repos ${fmtClock(b.rest)}` : ""}</span>
+              <span className="blk-label">{b.label}{b.rest ? ` · ${t.session.rest(fmtClock(b.rest))}` : ""}</span>
               <span className="row">
-                {b.tag === "bonus" && <span className="pill bonus">Bonus</span>}
-                {b.tag === "noyau" && <span className="pill">Noyau</span>}
+                {b.tag === "bonus" && <span className="pill bonus">{t.session.bonus}</span>}
+                {b.tag === "core" && <span className="pill">{t.session.core}</span>}
                 {b.tag === "bonus" && (
                   <button type="button" className="btn sm ghost" onClick={() => patch((x) => { const y = x.blocks.find((z) => z.id === b.id)!; y.skipped = !y.skipped; })}>
-                    {b.skipped ? "Reprendre" : "Passer"}
+                    {b.skipped ? t.session.resume : t.session.skip}
                   </button>
                 )}
               </span>
@@ -168,9 +169,9 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
                 <div className="row between">
                   <div className="chips">
                     {b.values.length ? b.values.map((v, i) => {
-                      const p = parseValue(v, t);
+                      const p = parseValue(v, target1);
                       return p ? <Chip key={i} v={p} /> : null;
-                    }) : <span className="small">Aucune série</span>}
+                    }) : <span className="small">{t.session.noSet}</span>}
                   </div>
                   <span className="setcount">{b.values.length}/{b.sets}</span>
                 </div>
@@ -178,23 +179,23 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
                   <input
                     className="field mono"
                     id={`in-${b.id}`}
-                    aria-label={`Résultat, ${b.label}`}
+                    aria-label={t.session.resultLabel(b.label)}
                     value={inputs[b.id] ?? ""}
-                    placeholder={ph || "valeur"}
+                    placeholder={ph || t.session.valuePh}
                     autoComplete="off"
                     onChange={(e) => setInputs((m) => ({ ...m, [b.id]: e.target.value }))}
                     onKeyDown={(e) => e.key === "Enter" && addSet(b.id)}
                   />
-                  <button type="button" className="btn primary" onClick={() => addSet(b.id)}>Série</button>
-                  <button type="button" className="btn ghost" disabled={!b.values.length} onClick={() => patch((x) => { x.blocks.find((y) => y.id === b.id)!.values.pop(); })}>Annuler</button>
+                  <button type="button" className="btn primary" onClick={() => addSet(b.id)}>{t.session.logSet}</button>
+                  <button type="button" className="btn ghost" disabled={!b.values.length} onClick={() => patch((x) => { x.blocks.find((y) => y.id === b.id)!.values.pop(); })}>{t.session.undo}</button>
                 </div>
                 {holdable && (
                   <div className="row">
                     <button type="button" className={`btn sm ${holdLeft !== null ? "work" : ""}`} onClick={() => toggleHold(b.id)}>
-                      {holdLeft !== null ? "Arrêter le hold" : "Chrono hold"}
+                      {holdLeft !== null ? t.session.holdStop : t.session.holdStart}
                     </button>
                     {holdLeft !== null && (
-                      <span className="mono big-inline">{holdLeft < 0 ? `départ dans ${Math.ceil(-holdLeft)}` : `${Math.floor(holdLeft)} s`}</span>
+                      <span className="mono big-inline">{holdLeft < 0 ? t.session.holdIn(Math.ceil(-holdLeft)) : `${Math.floor(holdLeft)} s`}</span>
                     )}
                   </div>
                 )}
@@ -205,62 +206,55 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
       })}
 
       <section className="card">
-        <span className="blk-label">Lignes libres</span>
+        <span className="blk-label">{t.session.freeLines}</span>
         {editLines === null ? (
           <>
             {s.lines.map((l, i) => <LineView key={i} line={l} />)}
             {s.lines.length > 0 && (
-              <button type="button" className="btn sm ghost start" onClick={() => setEditLines(s.lines.join("\n"))}>Modifier le texte</button>
+              <button type="button" className="btn sm ghost start" onClick={() => setEditLines(s.lines.join("\n"))}>{t.session.editText}</button>
             )}
           </>
         ) : (
           <>
-            <textarea className="field mono" id="s-edit-lines" rows={Math.max(4, s.lines.length + 1)} value={editLines} onChange={(e) => setEditLines(e.target.value)} aria-label="Lignes de la séance" />
+            <textarea className="field mono" id="s-edit-lines" rows={Math.max(4, s.lines.length + 1)} value={editLines} onChange={(e) => setEditLines(e.target.value)} aria-label={t.session.linesLabel} />
             <div className="row">
-              <button type="button" className="btn sm primary" onClick={() => { patch((x) => { x.lines = editLines.split("\n").map((l) => l.trim()).filter(Boolean); }); setEditLines(null); }}>Enregistrer</button>
-              <button type="button" className="btn sm ghost" onClick={() => setEditLines(null)}>Annuler</button>
+              <button type="button" className="btn sm primary" onClick={() => { patch((x) => { x.lines = editLines.split("\n").map((l) => l.trim()).filter(Boolean); }); setEditLines(null); }}>{t.session.save}</button>
+              <button type="button" className="btn sm ghost" onClick={() => setEditLines(null)}>{t.common.cancel}</button>
             </div>
           </>
         )}
-        <textarea
-          className="field mono"
-          id="s-free"
-          value={free}
-          onChange={(e) => setFree(e.target.value)}
-          placeholder={"Curl négatif 3x [5] : 5,5,5\nHandstand libre"}
-          aria-label="Nouvelle ligne"
-        />
+        <textarea className="field mono" id="s-free" value={free} onChange={(e) => setFree(e.target.value)} placeholder={t.session.freePh} aria-label={t.session.newLineLabel} />
         {freePreview.length > 0 && <div className="preview">{freePreview.map((l, i) => <LineView key={i} parsed={parseLine(l)} />)}</div>}
         <div className="row">
-          <button type="button" className="btn" disabled={!freePreview.length} onClick={() => { patch((x) => { x.lines.push(...freePreview); }); setFree(""); }}>Ajouter à la séance</button>
+          <button type="button" className="btn" disabled={!freePreview.length} onClick={() => { patch((x) => { x.lines.push(...freePreview); }); setFree(""); }}>{t.session.addToSession}</button>
         </div>
       </section>
 
       <section className="card">
         <div className="row between">
-          <span className="blk-label">Activités</span>
-          <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(s.date)}>+ Activité</button>
+          <span className="blk-label">{t.session.activities}</span>
+          <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(s.date)}>{t.week.plusActivity}</button>
         </div>
         {s.activities.length ? s.activities.map((a) => (
           <div key={a.id} className="row between nowrap">
             <ActivityLine {...a} />
-            <button type="button" className="btn sm ghost" aria-label={`Retirer ${a.label}`} onClick={() => patch((x) => { x.activities = x.activities.filter((y) => y.id !== a.id); })}>Retirer</button>
+            <button type="button" className="btn sm ghost" aria-label={t.session.removeLabel(a.label)} onClick={() => patch((x) => { x.activities = x.activities.filter((y) => y.id !== a.id); })}>{t.session.remove}</button>
           </div>
-        )) : <span className="small">Vélo, running, escalade… ajoutés ce jour-là.</span>}
+        )) : <span className="small">{t.session.activitiesHint}</span>}
       </section>
 
       <section className="card">
-        <label className="lbl" htmlFor="s-note">Note de séance
-          <textarea className="field" id="s-note" value={s.note} placeholder="Ressenti, fatigue, ce qui a changé" onChange={(e) => patch((x) => { x.note = e.target.value; })} />
+        <label className="lbl" htmlFor="s-note">{t.session.note}
+          <textarea className="field" id="s-note" value={s.note} placeholder={t.session.notePh} onChange={(e) => patch((x) => { x.note = e.target.value; })} />
         </label>
         <div className="row between">
           {live
-            ? <button type="button" className="btn primary" onClick={finish}>Terminer la séance</button>
-            : <button type="button" className="btn primary" onClick={close}>Fermer</button>}
-          <Confirm label="Supprimer" confirmLabel="Supprimer la séance" onConfirm={() => {
+            ? <button type="button" className="btn primary" onClick={finish}>{t.session.finish}</button>
+            : <button type="button" className="btn primary" onClick={close}>{t.session.close}</button>}
+          <Confirm label={t.session.delete} confirmLabel={t.session.deleteConfirm} onConfirm={() => {
             update((d) => { d.sessions = d.sessions.filter((y) => y.id !== s.id); d.activeId = null; });
             stopRest();
-            toast("Séance supprimée.");
+            toast(t.session.deleted);
             nav.go("semaine");
           }} />
         </div>

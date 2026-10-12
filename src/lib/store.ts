@@ -1,7 +1,7 @@
 // État de l'application, stocké sur l'appareil (localStorage). Aucune donnée ne quitte le navigateur.
 
 import { useSyncExternalStore } from "react";
-import type { Activity } from "./activities";
+import { type Activity, LEGACY_TYPES } from "./activities";
 import type { BlockDef } from "./program";
 
 export interface Block extends BlockDef {
@@ -23,10 +23,13 @@ export interface Session {
   source: "live" | "import" | "manual";
 }
 
+export type LangSetting = "auto" | "fr" | "en";
+
 export interface Settings {
   defaultRest: number;
   skillRest: number;
   targetMinutes: number;
+  lang: LangSetting;
 }
 
 export interface Data {
@@ -40,7 +43,7 @@ export interface Data {
 
 const KEY = "lightgym:v1";
 
-export const DEFAULT_SETTINGS: Settings = { defaultRest: 90, skillRest: 150, targetMinutes: 40 };
+export const DEFAULT_SETTINGS: Settings = { defaultRest: 90, skillRest: 150, targetMinutes: 40, lang: "auto" };
 
 const emptyData = (): Data => ({
   version: 1,
@@ -63,9 +66,15 @@ function normalizeSession(s: Partial<Session>): Session {
     id: s.id || uid(),
     date: s.date || "1970-01-01",
     title: s.title ?? "",
-    blocks: arr<Block>(s.blocks).map((b) => ({ ...b, values: arr<string>(b.values), skipped: !!b.skipped, exos: arr(b.exos) })),
+    blocks: arr<Block>(s.blocks).map((b) => ({
+      ...b,
+      tag: (b.tag as string) === "noyau" ? "core" : b.tag,
+      values: arr<string>(b.values),
+      skipped: !!b.skipped,
+      exos: arr(b.exos),
+    })),
     lines: arr<string>(s.lines),
-    activities: arr<Activity>(s.activities).map((a) => ({ ...a, id: a.id || uid() })),
+    activities: arr<Activity>(s.activities).map((a) => ({ ...a, id: a.id || uid(), type: LEGACY_TYPES[a.type] ?? a.type })),
     note: s.note ?? "",
     status: s.status === "live" ? "live" : "done",
     startedAt: s.startedAt,
@@ -98,15 +107,15 @@ function load(): Data {
 }
 
 let data: Data = typeof localStorage === "undefined" ? emptyData() : load();
-let saveError: string | null = null;
+let saveFailed = false;
 const listeners = new Set<() => void>();
 
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
-    saveError = null;
+    saveFailed = false;
   } catch {
-    saveError = "Enregistrement impossible : le stockage du navigateur est plein ou bloqué. Exporte une sauvegarde depuis Outils.";
+    saveFailed = true;
   }
 }
 
@@ -130,7 +139,8 @@ const subscribe = (l: () => void) => {
 };
 
 export const getData = () => data;
-export const getSaveError = () => saveError;
+/** Vrai quand le dernier enregistrement a échoué (stockage plein ou bloqué). */
+export const getSaveFailed = () => saveFailed;
 export const useData = () => useSyncExternalStore(subscribe, getData);
 
 // Synchronise les onglets ouverts en parallèle.

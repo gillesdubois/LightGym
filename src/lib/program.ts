@@ -1,15 +1,13 @@
-// Programme écrit en texte, transformé en gabarits de séance.
+// Programme écrit en texte, transformé en gabarits de séance. Repères en français ou en anglais.
 //
-//   ## Lundi — Pull / Front lever
-//   Bloc 1 · skill | repos 2:30
-//   - Front lever one-leg 5x [8-12s]
-//   Superset A · noyau | 4 tours | repos 1:30
-//   - Tractions strictes [8-10]
-//   - Swing KB 20 kg [15]
+//   ## Lundi — Pull                         ## Monday — Pull
+//   Bloc 1 · skill | repos 2:30             Block 1 · skill | rest 2:30
+//   - Front lever one-leg 5x [8-12s]        - Front lever one-leg 5x [8-12s]
+//   Superset A · noyau | 4 tours | …        Superset A · core | 4 rounds | rest 1:30
 //
-// Un titre sans jour ("## Séance légère") donne un gabarit disponible n'importe quel jour.
+// Un titre sans jour ("## Séance courte") donne un gabarit disponible n'importe quel jour.
 
-import { dayIndexFromName } from "./dates";
+import { DAY_NAME_PATTERN, dayIndexFromName, type Lang } from "./dates";
 
 export interface ExoDef {
   name: string;
@@ -18,7 +16,7 @@ export interface ExoDef {
 
 export interface BlockDef {
   label: string;
-  tag?: "noyau" | "bonus";
+  tag?: "core" | "bonus";
   kind: "skill" | "superset" | "single";
   exos: ExoDef[];
   sets: number;
@@ -38,11 +36,15 @@ export interface ProgramSettings {
   skillRest: number;
 }
 
-const DAY_HEAD_RE =
-  /^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|mar|mer|jeu|ven|sam|dim)\.?(?:\s*(?:[—–:-]+)\s*(.*))?$/i;
+export type ProgramWarning =
+  | { kind: "emptyBlock"; block: string; template: string }
+  | { kind: "emptyTemplate"; template: string };
+
+const DAY_HEAD_RE = new RegExp(String.raw`^(${DAY_NAME_PATTERN})\.?(?:\s*(?:[—–:-]+)\s*(.*))?$`, "i");
+const TAG_WORDS = String.raw`bonus|optional|optionnel|noyau|core`;
 
 function parseRest(text: string): number | null {
-  const m = text.match(/repos\s*(\d+)\s*(?::\s*(\d{1,2}))?\s*(min|mn|s|sec)?/i);
+  const m = text.match(/(?:repos|rest)\s*(\d+)\s*(?::\s*(\d{1,2}))?\s*(min|mn|s|sec)?/i);
   if (!m) return null;
   const a = parseInt(m[1], 10);
   if (m[2] !== undefined) return a * 60 + parseInt(m[2], 10);
@@ -55,16 +57,16 @@ function slug(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-export function parseProgram(text: string, settings: ProgramSettings): { templates: Template[]; warnings: string[] } {
+export function parseProgram(text: string, settings: ProgramSettings): { templates: Template[]; warnings: ProgramWarning[] } {
   const templates: Template[] = [];
-  const warnings: string[] = [];
+  const warnings: ProgramWarning[] = [];
   let tpl: Template | null = null;
   let block: (BlockDef & { setsFixed: boolean; restFixed: boolean }) | null = null;
 
   const closeBlock = () => {
     if (!tpl || !block) return;
     if (!block.exos.length) {
-      warnings.push(`« ${block.label} » (${tpl.name}) ne contient aucun exercice.`);
+      warnings.push({ kind: "emptyBlock", block: block.label, template: tpl.name });
     } else {
       if (block.kind !== "skill") block.kind = block.exos.length > 1 ? "superset" : "single";
       if (!block.restFixed) block.rest = block.kind === "skill" ? settings.skillRest : settings.defaultRest;
@@ -85,7 +87,7 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
       const dm = name.match(DAY_HEAD_RE);
       const wd = dm ? dayIndexFromName(dm[1]) : null;
       const title = dm ? (dm[2]?.trim() || name) : name;
-      let id = slug(name) || `gabarit-${templates.length + 1}`;
+      let id = slug(name) || `template-${templates.length + 1}`;
       while (templates.some((t) => t.id === id)) id += "-2";
       tpl = { id, name, title, weekday: wd, blocks: [] };
       templates.push(tpl);
@@ -133,14 +135,14 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
     // En-tête de bloc.
     closeBlock();
     const parts = line.split("|").map((p) => p.trim());
-    const tag: BlockDef["tag"] = /\bbonus\b/i.test(line) ? "bonus" : /\bnoyau\b/i.test(line) ? "noyau" : undefined;
-    const label = parts[0].replace(/\s*[·•(-]?\s*\(?\b(?:bonus|noyau)\b\)?\s*$/i, "").trim() || parts[0];
+    const tag: BlockDef["tag"] = /\b(?:bonus|optional|optionnel)\b/i.test(line) ? "bonus" : /\b(?:noyau|core)\b/i.test(line) ? "core" : undefined;
+    const label = parts[0].replace(new RegExp(String.raw`\s*[·•(-]?\s*\(?\b(?:${TAG_WORDS})\b\)?\s*$`, "i"), "").trim() || parts[0];
     const rest = parseRest(line);
-    const setsMatch = line.match(/(\d+)\s*(?:tours?|s[ée]ries?)\b/i);
+    const setsMatch = line.match(/(\d+)\s*(?:tours?|s[ée]ries?|rounds?|sets?)\b/i);
     block = {
       label,
       tag,
-      kind: /skill|technique/i.test(label) ? "skill" : "single",
+      kind: /skill|technique|technical/i.test(label) ? "skill" : "single",
       exos: [],
       sets: setsMatch ? parseInt(setsMatch[1], 10) : 3,
       rest: rest ?? 0,
@@ -149,7 +151,7 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
     };
   }
   closeBlock();
-  for (const t of templates) if (!t.blocks.length) warnings.push(`« ${t.name} » ne contient aucun bloc.`);
+  for (const t of templates) if (!t.blocks.length) warnings.push({ kind: "emptyTemplate", template: t.name });
   return { templates: templates.filter((t) => t.blocks.length), warnings };
 }
 
@@ -157,14 +159,14 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
 export function placeholderFor(block: Pick<BlockDef, "exos">): string {
   const parts = block.exos.map((e) => {
     // Seulement les objectifs chiffrés : "8-10", "8-12s", "5-6 / jambe". Pas "3-4 km, allure facile".
-    const m = e.target.match(/^\s*(\d+(?:[.,]\d+)?)(?:\s*(?:-|–|à)\s*(\d+(?:[.,]\d+)?))?\s*(s|sec|reps?)?\s*(?:\/\s*(?:jambe|côté|cote|bras))?\s*$/i);
+    const m = e.target.match(/^\s*(\d+(?:[.,]\d+)?)(?:\s*(?:-|–|à|to)\s*(\d+(?:[.,]\d+)?))?\s*(s|sec|reps?)?\s*(?:\/\s*(?:jambe|côté|cote|bras|leg|side|arm))?\s*$/i);
     if (!m) return "";
     return (m[2] ?? m[1]) + (m[3] && /^s/i.test(m[3]) ? "s" : "");
   });
   return parts.every(Boolean) ? parts.join("/") : "";
 }
 
-export const EXAMPLE_PROGRAM = `# Programme d'exemple
+const EXAMPLE_FR = `# Programme d'exemple
 > Remplace ce texte par ton propre programme. Un titre ## par séance ; commence-le par un jour pour l'associer à ce jour.
 
 ## Lundi — Haut du corps
@@ -203,3 +205,45 @@ Circuit | 3 tours | repos 1:00
 - Squat [15]
 - Gainage [30s]
 `;
+
+const EXAMPLE_EN = `# Example program
+> Replace this text with your own program. One ## heading per session; start it with a weekday to plan it on that day.
+
+## Monday — Upper body
+Block 1 · skill | rest 2:30
+- Hollow hold 3x [30-45s]
+Superset A · core | 4 rounds | rest 1:30
+- Pull-ups [6-8]
+- Push-ups [12-15]
+Superset B · bonus | 3 rounds | rest 1:30
+- Ring rows [8-12]
+- Dips [6-10]
+
+## Tuesday — Cardio
+- Running : 30 min easy
+- Mobility : 10 min
+
+## Wednesday — Lower body
+Superset A · core | 4 rounds | rest 1:30
+- Bulgarian split squat [8-10 / leg]
+- Glute bridge [12-15]
+Superset B · bonus | 3 rounds | rest 1:30
+- Reverse lunges [8 / leg]
+- Side plank [30s]
+
+## Friday — Full body
+Superset A · core | 4 rounds | rest 1:30
+- Pull-ups [6-8]
+- Squats [12-15]
+Superset B · core | 3 rounds | rest 1:30
+- Push-ups [12-15]
+- Mountain climbers [20]
+
+## Short session
+Circuit | 3 rounds | rest 1:00
+- Push-ups [10]
+- Squats [15]
+- Plank [30s]
+`;
+
+export const EXAMPLE_PROGRAM: Record<Lang, string> = { fr: EXAMPLE_FR, en: EXAMPLE_EN };

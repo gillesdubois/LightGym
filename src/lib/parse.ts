@@ -11,7 +11,8 @@ export interface Target {
 export interface Value {
   txt: string;
   kind: "num" | "pair" | "txt";
-  side: "D" | "G" | null;
+  /** Côté : D/G en français, R/L en anglais. */
+  side: "D" | "G" | "R" | "L" | null;
   num?: number;
   pair?: [number, number];
   unit?: string;
@@ -47,10 +48,10 @@ export function parseValue(token: string, target: Target | null = null): Value |
   if (!raw) return null;
   const v: Value = { txt: raw, kind: "txt", side: null, cls: "" };
   let rest = ` ${raw} `;
-  const side = rest.match(/(?:^|[\s\d])([DG])(?=[\s\d])/);
+  const side = rest.match(/(?:^|[\s\d])([DGRL])(?=[\s\d])/);
   if (side) {
-    v.side = side[1] as "D" | "G";
-    rest = rest.replace(/([\s\d])?[DG](?=[\s\d])/, "$1 ");
+    v.side = side[1] as Value["side"];
+    rest = rest.replace(/([\s\d])?[DGRL](?=[\s\d])/, "$1 ");
   }
   rest = rest.trim();
   let m: RegExpMatchArray | null;
@@ -94,7 +95,7 @@ export function parseLine(line: string): ParsedLine | null {
   if (t) {
     out.targetTxt = t[1].trim();
     // Objectif de superset ("8-10 / 15") : pas de comparaison automatique.
-    out.target = /\//.test(out.targetTxt) && !/jambe|côté|cote|bras/i.test(out.targetTxt) ? null : parseTarget(out.targetTxt);
+    out.target = /\//.test(out.targetTxt) && !/jambe|côté|cote|bras|leg|side|arm/i.test(out.targetTxt) ? null : parseTarget(out.targetTxt);
     left = left.replace(t[0], " ");
   }
   const st = left.match(/(?:^|\s)(\d+)\s*[x×](?=\s|$)/i);

@@ -371,7 +371,7 @@ details[open] > summary { margin-bottom: 8px; }
 .hist-body { display: grid; gap: 4px; }
 
 /* ---------- Outils ---------- */
-.subnav { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.subnav { display: flex; flex-wrap: wrap; gap: 6px; }
 .subnav button { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 13px; font-size: 14px; font-weight: 600; color: var(--muted); }
 .subnav button[aria-selected="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .checks { display: grid; gap: 8px; font-size: 15px; }

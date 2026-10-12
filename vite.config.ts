@@ -11,8 +11,8 @@ export default defineConfig({
       manifest: {
         name: "LightGym",
         short_name: "LightGym",
-        description: "Carnet de séances permissif, chronos et bilans.",
-        lang: "fr",
+        description: "A training log that reads your notes the way you write them.",
+        lang: "en",
         start_url: "/",
         display: "standalone",
         background_color: "#ECEFE8",

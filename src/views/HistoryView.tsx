@@ -2,18 +2,20 @@ import { useMemo, useState } from "react";
 import type { Nav } from "../App";
 import { Chip, SessionBody } from "../components/common";
 import { isCycling } from "../lib/activities";
-import { addDays, dayLabel, ddmm, ddmmyyyy, fromISO, MONTHS, pad, todayISO, toISO, weekday } from "../lib/dates";
+import { addDays, DAYS, dayLabel, ddmm, ddmmyyyy, fromISO, MONTHS, pad, todayISO, toISO, weekday } from "../lib/dates";
+import { useT } from "../lib/i18n";
 import { bestOf } from "../lib/parse";
 import { type ExerciseIndex, hasTraining, indexExercises, isEmpty } from "../lib/sessions";
 import type { Data, Session } from "../lib/store";
 
 export default function HistoryView({ data, nav, initialDate }: { data: Data; nav: Nav; initialDate: string | null }) {
+  const t = useT();
   const [mode, setMode] = useState<"cal" | "ex">("cal");
   return (
     <div className="stack">
-      <div className="seg" role="tablist" aria-label="Affichage de l'historique">
-        <button type="button" role="tab" aria-selected={mode === "cal"} onClick={() => setMode("cal")}>Calendrier</button>
-        <button type="button" role="tab" aria-selected={mode === "ex"} onClick={() => setMode("ex")}>Exercices</button>
+      <div className="seg" role="tablist" aria-label={t.history.viewLabel}>
+        <button type="button" role="tab" aria-selected={mode === "cal"} onClick={() => setMode("cal")}>{t.history.calendar}</button>
+        <button type="button" role="tab" aria-selected={mode === "ex"} onClick={() => setMode("ex")}>{t.history.exercises}</button>
       </div>
       {mode === "cal" ? <Calendar data={data} nav={nav} initialDate={initialDate} /> : <Exercises data={data} />}
     </div>
@@ -23,6 +25,7 @@ export default function HistoryView({ data, nav, initialDate }: { data: Data; na
 /* ---------- Calendrier ---------- */
 
 function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDate: string | null }) {
+  const t = useT();
   const today = todayISO();
   const [selected, setSelected] = useState(initialDate ?? today);
   const [month, setMonth] = useState(() => selected.slice(0, 7));
@@ -44,7 +47,7 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
   const training = monthSessions.filter(hasTraining).length;
   const acts = monthSessions.flatMap((s) => s.activities);
   const bike = acts.filter((a) => isCycling(a.type)).reduce((n, a) => n + (a.distanceKm ?? 0), 0);
-  const run = acts.filter((a) => a.type === "Running").reduce((n, a) => n + (a.distanceKm ?? 0), 0);
+  const run = acts.filter((a) => a.type === "run").reduce((n, a) => n + (a.distanceKm ?? 0), 0);
   const activeDays = new Set(monthSessions.map((s) => s.date)).size;
 
   const shiftMonth = (n: number) => {
@@ -60,23 +63,23 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
   return (
     <>
       <div className="weeknav">
-        <button type="button" className="btn sm ghost" onClick={() => shiftMonth(-1)} aria-label="Mois précédent">‹</button>
-        <div className="weeknav-label"><b className="cap">{MONTHS[firstDate.getMonth()]} {firstDate.getFullYear()}</b></div>
-        <button type="button" className="btn sm ghost" onClick={() => shiftMonth(1)} aria-label="Mois suivant">›</button>
+        <button type="button" className="btn sm ghost" onClick={() => shiftMonth(-1)} aria-label={t.history.prevMonth}>‹</button>
+        <div className="weeknav-label"><b className="cap">{MONTHS[t.lang][firstDate.getMonth()]} {firstDate.getFullYear()}</b></div>
+        <button type="button" className="btn sm ghost" onClick={() => shiftMonth(1)} aria-label={t.history.nextMonth}>›</button>
       </div>
 
       <div className="stats">
-        <div className="stat"><b>{training}</b><span>séances</span></div>
-        <div className="stat"><b>{activeDays}<span className="of"> / {daysInMonth}</span></b><span>jours actifs</span></div>
-        <div className="stat"><b>{bike ? Math.round(bike) : "–"}<span className="of"> km</span></b><span>vélo</span></div>
-        <div className="stat"><b>{run ? run.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "–"}<span className="of"> km</span></b><span>course</span></div>
+        <div className="stat"><b>{training}</b><span>{t.history.sessions}</span></div>
+        <div className="stat"><b>{activeDays}<span className="of"> / {daysInMonth}</span></b><span>{t.history.activeDays}</span></div>
+        <div className="stat"><b>{bike ? Math.round(bike) : "–"}<span className="of"> km</span></b><span>{t.history.bike}</span></div>
+        <div className="stat"><b>{run ? run.toLocaleString(t.locale, { maximumFractionDigits: 1 }) : "–"}<span className="of"> km</span></b><span>{t.history.run}</span></div>
       </div>
 
       <div className="card cal">
         <div className="cal-grid cal-head" aria-hidden="true">
-          {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => <span key={i}>{d}</span>)}
+          {DAYS[t.lang].initial.map((d, i) => <span key={i}>{d}</span>)}
         </div>
-        <div className="cal-grid" role="grid" aria-label="Jours du mois">
+        <div className="cal-grid" role="grid" aria-label={t.history.daysLabel}>
           {cells.map((date, i) => {
             if (!date) return <span key={i} />;
             const list = byDate.get(date) ?? [];
@@ -88,7 +91,7 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
                 type="button"
                 className={`cal-day ${date === selected ? "sel" : ""} ${date === today ? "today" : ""} ${list.length ? "has" : ""}`}
                 aria-pressed={date === selected}
-                aria-label={`${dayLabel(date)}${train ? ", séance" : ""}${act ? ", activité" : ""}`}
+                aria-label={`${dayLabel(date, t.lang)}${train ? `, ${t.history.session}` : ""}${act ? `, ${t.history.activity}` : ""}`}
                 onClick={() => setSelected(date)}
               >
                 <span className="num">{fromISO(date).getDate()}</span>
@@ -100,24 +103,24 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
             );
           })}
         </div>
-        <div className="legend small"><span><i className="m-train" /> séance</span><span><i className="m-act" /> activité</span></div>
+        <div className="legend small"><span><i className="m-train" /> {t.history.session}</span><span><i className="m-act" /> {t.history.activity}</span></div>
       </div>
 
       <section className="card">
         <div className="row between">
-          <b>{dayLabel(selected)}</b>
+          <b>{dayLabel(selected, t.lang)}</b>
           <span className="row">
-            <button type="button" className="btn sm" onClick={() => nav.startSession(selected, null)}>Saisir</button>
-            <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(selected)}>+ Activité</button>
+            <button type="button" className="btn sm" onClick={() => nav.startSession(selected, null)}>{t.history.log}</button>
+            <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(selected)}>{t.history.plusActivity}</button>
           </span>
         </div>
         {dayList.length ? dayList.map((s) => (
           <div key={s.id} className="day-session">
             {s.title && <div className="blk-label">{s.title}</div>}
             <SessionBody session={s} />
-            <div className="row"><button type="button" className="btn sm" onClick={() => nav.openSession(s.id)}>Ouvrir</button></div>
+            <div className="row"><button type="button" className="btn sm" onClick={() => nav.openSession(s.id)}>{t.history.open}</button></div>
           </div>
-        )) : <span className="small">Rien d'enregistré ce jour-là.</span>}
+        )) : <span className="small">{t.history.nothing}</span>}
       </section>
     </>
   );
@@ -143,6 +146,7 @@ function Sparkline({ points }: { points: number[] }) {
 }
 
 function Exercises({ data }: { data: Data }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const index = useMemo(() => indexExercises(data.sessions), [data.sessions]);
@@ -154,8 +158,8 @@ function Exercises({ data }: { data: Data }) {
 
   return (
     <>
-      <input className="field" id="ex-search" type="search" placeholder="Chercher un exercice" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Chercher un exercice" />
-      {!index.length && <p className="small">Les exercices apparaissent ici dès qu'une séance contient des séries.</p>}
+      <input className="field" id="ex-search" type="search" placeholder={t.history.search} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t.history.search} />
+      {!index.length && <p className="small">{t.history.emptyIndex}</p>}
       <div className="ex-list">
         {list.map((i) => {
           const lastE = i.entries[i.entries.length - 1];
@@ -164,7 +168,7 @@ function Exercises({ data }: { data: Data }) {
             <button key={i.key} type="button" className="ex-row" onClick={() => setOpen(i.key)}>
               <span className="ex-row-main">
                 <b>{i.name}</b>
-                <span className="small mono">{i.entries.length} séance{i.entries.length > 1 ? "s" : ""} · {ddmm(lastE.date)} · {lastE.values.map((v) => v.txt).join(",")}</span>
+                <span className="small mono">{t.history.sessionsCount(i.entries.length)} · {ddmm(lastE.date)} · {lastE.values.map((v) => v.txt).join(",")}</span>
               </span>
               <Sparkline points={pts} />
             </button>
@@ -176,18 +180,23 @@ function Exercises({ data }: { data: Data }) {
 }
 
 function ExerciseDetail({ item, onBack }: { item: ExerciseIndex; onBack: () => void }) {
+  const t = useT();
   const entries = [...item.entries].reverse();
   const pts = item.entries.map((e) => bestOf(e.values)).filter((x): x is number => x !== null);
   return (
     <>
-      <button type="button" className="btn sm ghost start" onClick={onBack}>‹ Tous les exercices</button>
+      <button type="button" className="btn sm ghost start" onClick={onBack}>{t.history.back}</button>
       <section className="card">
         <h2 className="h2">{item.name}</h2>
         <div className="row between">
-          <span className="small">{item.entries.length} séances depuis le {ddmmyyyy(item.entries[0].date)}</span>
+          <span className="small">{t.history.since(item.entries.length, ddmmyyyy(item.entries[0].date))}</span>
           <Sparkline points={pts.slice(-20)} />
         </div>
-        {pts.length > 0 && <span className="small">Meilleure série : <b className="mono">{Math.max(...pts)}</b> · moyenne des meilleures : <span className="mono">{(pts.reduce((a, b) => a + b, 0) / pts.length).toFixed(1)}</span></span>}
+        {pts.length > 0 && (
+          <span className="small">
+            {t.history.best} <b className="mono">{Math.max(...pts)}</b> · {t.history.avgBest} <span className="mono">{(pts.reduce((a, b) => a + b, 0) / pts.length).toLocaleString(t.locale, { maximumFractionDigits: 1 })}</span>
+          </span>
+        )}
       </section>
       <div className="card hist">
         {entries.map((e, i) => (

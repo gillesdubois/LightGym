@@ -1,5 +1,5 @@
 import type { Activity } from "./activities";
-import { addDays, dayLabel, ddmm, mondayOf } from "./dates";
+import { addDays, dayLabel, ddmm, type Lang, mondayOf } from "./dates";
 import { type ExerciseEntry, parseLine, splitExercises } from "./parse";
 import type { Template } from "./program";
 import { type Block, type Data, type Session, uid } from "./store";
@@ -85,26 +85,41 @@ export function indexExercises(sessions: Session[]): ExerciseIndex[] {
 
 /* ---------- Markdown ---------- */
 
-function sessionMarkdown(s: Session): string {
-  let md = `## ${dayLabel(s.date)}${s.title ? ` — ${s.title}` : ""}\n\n`;
+// Libellés des exports. Les deux formes se réimportent (voir importer.ts).
+const MD: Record<Lang, { weekOf: string; other: string; note: string; none: string; context: string; program: string; trends: string; request: string }> = {
+  fr: {
+    weekOf: "Semaine du", other: "Autre :", note: "Note :", none: "Aucune séance enregistrée.",
+    context: "Contexte", program: "Programme en cours",
+    trends: "Historique des exercices de la semaine (5 dernières séances)", request: "Demande",
+  },
+  en: {
+    weekOf: "Week of", other: "Other:", note: "Note:", none: "No session logged.",
+    context: "Context", program: "Current program",
+    trends: "History of this week's exercises (last 5 sessions)", request: "Request",
+  },
+};
+
+function sessionMarkdown(s: Session, lang: Lang): string {
+  const t = MD[lang];
+  let md = `## ${dayLabel(s.date, lang)}${s.title ? ` — ${s.title}` : ""}\n\n`;
   const lines = sessionLines(s);
   lines.forEach((l) => (md += `* ${l}\n`));
-  if (s.activities.length) md += `${lines.length ? "\n" : ""}Autre :\n${s.activities.map((a) => `- ${a.label}`).join("\n")}\n`;
-  if (s.note.trim()) md += `\nNote : ${s.note.trim()}\n`;
+  if (s.activities.length) md += `${lines.length ? "\n" : ""}${t.other}\n${s.activities.map((a) => `- ${a.label}`).join("\n")}\n`;
+  if (s.note.trim()) md += `\n${t.note} ${s.note.trim()}\n`;
   return md;
 }
 
-export function weekMarkdown(data: Data, monday: string): string {
+export function weekMarkdown(data: Data, monday: string, lang: Lang = "fr"): string {
   const sessions = sessionsBetween(data, monday, addDays(monday, 6)).filter((s) => !isEmpty(s));
-  let md = `# Semaine du ${ddmm(monday)}\n`;
-  for (const s of sessions) md += `\n${sessionMarkdown(s)}`;
-  if (!sessions.length) md += "\nAucune séance enregistrée.\n";
+  let md = `# ${MD[lang].weekOf} ${ddmm(monday)}\n`;
+  for (const s of sessions) md += `\n${sessionMarkdown(s, lang)}`;
+  if (!sessions.length) md += `\n${MD[lang].none}\n`;
   return md;
 }
 
-export function allMarkdown(data: Data): string {
+export function allMarkdown(data: Data, lang: Lang = "fr"): string {
   const mondays = [...new Set(data.sessions.filter((s) => !isEmpty(s)).map((s) => mondayOf(s.date)))].sort();
-  return mondays.map((m) => weekMarkdown(data, m)).join("\n");
+  return mondays.map((m) => weekMarkdown(data, m, lang)).join("\n");
 }
 
 /* ---------- Prompt de bilan ---------- */
@@ -116,6 +131,7 @@ export interface PromptOptions {
   trends: boolean;
   week: boolean;
   question: string;
+  lang?: Lang;
 }
 
 export function trendsText(data: Data, monday: string, maxPoints = 5): string {
@@ -136,14 +152,16 @@ export function trendsText(data: Data, monday: string, maxPoints = 5): string {
 }
 
 export function buildPrompt(data: Data, o: PromptOptions): string {
+  const lang = o.lang ?? "fr";
+  const t = MD[lang];
   const parts: string[] = [];
-  if (o.context && data.context.trim()) parts.push(`## Contexte\n${data.context.trim()}`);
-  if (o.program && data.programText.trim()) parts.push(`## Programme en cours\n${data.programText.trim().replace(/^#\s.*\n?/m, "")}`);
+  if (o.context && data.context.trim()) parts.push(`## ${t.context}\n${data.context.trim()}`);
+  if (o.program && data.programText.trim()) parts.push(`## ${t.program}\n${data.programText.trim().replace(/^#\s.*\n?/m, "")}`);
   if (o.trends) {
-    const t = trendsText(data, o.monday);
-    if (t) parts.push(`## Historique des exercices de la semaine (5 dernières séances)\n${t}`);
+    const tr = trendsText(data, o.monday);
+    if (tr) parts.push(`## ${t.trends}\n${tr}`);
   }
-  if (o.week) parts.push(weekMarkdown(data, o.monday).replace(/^# /, "## "));
-  if (o.question.trim()) parts.push(`## Demande\n${o.question.trim()}`);
+  if (o.week) parts.push(weekMarkdown(data, o.monday, lang).replace(/^# /, "## "));
+  if (o.question.trim()) parts.push(`## ${t.request}\n${o.question.trim()}`);
   return parts.join("\n\n");
 }

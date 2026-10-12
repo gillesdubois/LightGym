@@ -1,13 +1,15 @@
+import { useState } from "react";
 import type { Nav } from "../App";
 import { SessionBody, useTemplates } from "../components/common";
 import { isCycling } from "../lib/activities";
 import { addDays, dayLabel, ddmm, isoWeek, mondayOf, todayISO, weekday } from "../lib/dates";
+import { useT } from "../lib/i18n";
 import { EXAMPLE_PROGRAM } from "../lib/program";
 import { hasTraining, isEmpty, sessionsBetween } from "../lib/sessions";
 import { type Data, update } from "../lib/store";
-import { useState } from "react";
 
 export default function WeekView({ data, nav }: { data: Data; nav: Nav }) {
+  const t = useT();
   const today = todayISO();
   const [monday, setMonday] = useState(mondayOf(today));
   const { templates } = useTemplates(data);
@@ -16,32 +18,30 @@ export default function WeekView({ data, nav }: { data: Data; nav: Nav }) {
 
   const training = sessions.filter(hasTraining).length;
   const acts = sessions.flatMap((s) => s.activities);
-  const km = (pred: (t: string) => boolean) => acts.filter((a) => pred(a.type)).reduce((n, a) => n + (a.distanceKm ?? 0), 0);
+  const km = (pred: (type: string) => boolean) => acts.filter((a) => pred(a.type)).reduce((n, a) => n + (a.distanceKm ?? 0), 0);
   const bike = km(isCycling);
-  const run = km((t) => t === "Running");
-  const planned = templates.filter((t) => t.weekday !== null).length;
+  const run = km((type) => type === "run");
+  const planned = templates.filter((x) => x.weekday !== null).length;
 
   if (!data.sessions.length && !data.programText.trim()) {
     return (
       <div className="stack">
         <section className="card">
-          <h2 className="h2">Pour commencer</h2>
-          <p>Le carnet est vide. Trois façons de le remplir :</p>
+          <h2 className="h2">{t.week.startTitle}</h2>
+          <p>{t.week.startIntro}</p>
           <ol className="steps">
-            <li>Écrire ton programme : chaque jour devient un gabarit de séance avec objectifs et repos.</li>
-            <li>Importer tes séances passées en collant tes notes telles quelles.</li>
-            <li>Démarrer une séance libre et écrire au fil de l'eau.</li>
+            {t.week.steps.map((s) => <li key={s}>{s}</li>)}
           </ol>
           <div className="row">
-            <button type="button" className="btn primary" onClick={() => nav.go("outils", { section: "programme" })}>Écrire mon programme</button>
-            <button type="button" className="btn" onClick={() => nav.go("outils", { section: "import" })}>Importer des séances</button>
+            <button type="button" className="btn primary" onClick={() => nav.go("outils", { section: "programme" })}>{t.week.writeProgram}</button>
+            <button type="button" className="btn" onClick={() => nav.go("outils", { section: "import" })}>{t.week.importSessions}</button>
           </div>
           <div className="row">
-            <button type="button" className="btn ghost" onClick={() => nav.startSession(today, null)}>Séance libre</button>
-            <button type="button" className="btn ghost" onClick={() => update((d) => { d.programText = EXAMPLE_PROGRAM; })}>Charger un programme d'exemple</button>
+            <button type="button" className="btn ghost" onClick={() => nav.startSession(today, null)}>{t.week.freeSession}</button>
+            <button type="button" className="btn ghost" onClick={() => update((d) => { d.programText = EXAMPLE_PROGRAM[t.lang]; })}>{t.week.loadExample}</button>
           </div>
         </section>
-        <p className="small">Les données restent sur cet appareil. Pense à exporter une sauvegarde de temps en temps (Outils → Sauvegarde).</p>
+        <p className="small">{t.week.localNote}</p>
       </div>
     );
   }
@@ -49,47 +49,47 @@ export default function WeekView({ data, nav }: { data: Data; nav: Nav }) {
   return (
     <div className="stack">
       <div className="weeknav">
-        <button type="button" className="btn sm ghost" onClick={() => setMonday(addDays(monday, -7))} aria-label="Semaine précédente">‹</button>
+        <button type="button" className="btn sm ghost" onClick={() => setMonday(addDays(monday, -7))} aria-label={t.common.prevWeek}>‹</button>
         <div className="weeknav-label">
-          <b>Semaine du {ddmm(monday)}</b>
-          <span className="mono small">S{isoWeek(monday)}</span>
+          <b>{t.common.weekOf(ddmm(monday))}</b>
+          <span className="mono small">{t.common.weekNum(isoWeek(monday))}</span>
         </div>
-        <button type="button" className="btn sm ghost" onClick={() => setMonday(addDays(monday, 7))} aria-label="Semaine suivante">›</button>
+        <button type="button" className="btn sm ghost" onClick={() => setMonday(addDays(monday, 7))} aria-label={t.common.nextWeek}>›</button>
       </div>
       {monday !== mondayOf(today) && (
-        <button type="button" className="btn sm ghost center" onClick={() => setMonday(mondayOf(today))}>Revenir à cette semaine</button>
+        <button type="button" className="btn sm ghost center" onClick={() => setMonday(mondayOf(today))}>{t.week.backToThisWeek}</button>
       )}
 
       <div className="stats">
-        <div className="stat"><b>{training}{planned ? <span className="of"> / {planned}</span> : null}</b><span>séances</span></div>
-        <div className="stat"><b>{acts.length}</b><span>activités</span></div>
-        <div className="stat"><b>{bike ? Math.round(bike) : "–"}<span className="of"> km</span></b><span>vélo</span></div>
-        <div className="stat"><b>{run ? run.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "–"}<span className="of"> km</span></b><span>course</span></div>
+        <div className="stat"><b>{training}{planned ? <span className="of"> / {planned}</span> : null}</b><span>{t.week.statSessions}</span></div>
+        <div className="stat"><b>{acts.length}</b><span>{t.week.statActivities}</span></div>
+        <div className="stat"><b>{bike ? Math.round(bike) : "–"}<span className="of"> km</span></b><span>{t.week.statBike}</span></div>
+        <div className="stat"><b>{run ? run.toLocaleString(t.locale, { maximumFractionDigits: 1 }) : "–"}<span className="of"> km</span></b><span>{t.week.statRun}</span></div>
       </div>
 
-      <button type="button" className="btn primary" onClick={() => nav.openActivity(today >= monday && today <= sunday ? today : monday)}>Ajouter une activité</button>
+      <button type="button" className="btn primary" onClick={() => nav.openActivity(today >= monday && today <= sunday ? today : monday)}>{t.week.addActivity}</button>
 
       {Array.from({ length: 7 }, (_, i) => addDays(monday, i)).map((date) => {
         const daySessions = sessions.filter((s) => s.date === date);
-        const tpl = templates.find((t) => t.weekday === weekday(date)) ?? null;
+        const tpl = templates.find((x) => x.weekday === weekday(date)) ?? null;
         const isToday = date === today;
         const isPast = date < today;
         return (
           <article key={date} className={`card day ${isToday ? "today" : ""}`}>
             <div className="day-head">
-              <span className="day-date">{dayLabel(date)}</span>
-              <span className="day-title">{daySessions[0]?.title || tpl?.title || (isPast ? "" : "Libre")}</span>
-              {daySessions.some((s) => s.status === "live") ? <span className="pill live">En cours</span>
-                : daySessions.some(hasTraining) ? <span className="pill done">Fait</span>
-                : daySessions.length ? <span className="pill done">Actif</span>
-                : tpl && !isPast ? <span className="pill">Prévu</span> : null}
+              <span className="day-date">{dayLabel(date, t.lang)}</span>
+              <span className="day-title">{daySessions[0]?.title || tpl?.title || (isPast ? "" : t.week.free)}</span>
+              {daySessions.some((s) => s.status === "live") ? <span className="pill live">{t.week.live}</span>
+                : daySessions.some(hasTraining) ? <span className="pill done">{t.week.done}</span>
+                : daySessions.length ? <span className="pill done">{t.week.active}</span>
+                : tpl && !isPast ? <span className="pill">{t.week.planned}</span> : null}
             </div>
             {daySessions.map((s) => (
               <div key={s.id} className="day-session">
                 {daySessions.length > 1 && s.title && <div className="blk-label">{s.title}</div>}
                 <SessionBody session={s} />
                 <div className="row">
-                  <button type="button" className="btn sm" onClick={() => nav.openSession(s.id)}>{s.status === "live" ? "Reprendre" : "Ouvrir"}</button>
+                  <button type="button" className="btn sm" onClick={() => nav.openSession(s.id)}>{s.status === "live" ? t.week.resume : t.week.open}</button>
                 </div>
               </div>
             ))}
@@ -100,13 +100,13 @@ export default function WeekView({ data, nav }: { data: Data; nav: Nav }) {
             )}
             <div className="row">
               {!daySessions.some((s) => s.status === "live") && (daySessions.some(hasTraining) ? (
-                <button type="button" className="btn sm ghost" onClick={() => nav.startSession(date, null)}>Autre séance</button>
+                <button type="button" className="btn sm ghost" onClick={() => nav.startSession(date, null)}>{t.week.another}</button>
               ) : (
                 <button type="button" className="btn sm" onClick={() => nav.startSession(date, tpl)}>
-                  {tpl ? (isPast ? "Saisir" : "Démarrer") : "Séance libre"}
+                  {tpl ? (isPast ? t.week.log : t.week.start) : t.week.freeSession}
                 </button>
               ))}
-              <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(date)}>+ Activité</button>
+              <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(date)}>{t.week.plusActivity}</button>
             </div>
           </article>
         );

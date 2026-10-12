@@ -53,14 +53,13 @@ export interface Preset {
   rounds: number;
   stopwatch?: boolean;
   custom?: boolean;
-  note?: string;
 }
 
 export const PRESETS: Preset[] = [
   { id: "corde", name: "Corde 60/20", work: 60, rest: 20, rounds: 10 },
   { id: "tabata", name: "Tabata", work: 20, rest: 10, rounds: 8 },
   { id: "hiit", name: "HIIT 40/20", work: 40, rest: 20, rounds: 10 },
-  { id: "emom", name: "EMOM", work: 60, rest: 0, rounds: 10, note: "un départ par minute" },
+  { id: "emom", name: "EMOM", work: 60, rest: 0, rounds: 10 },
   { id: "watch", name: "Chronomètre", work: 0, rest: 0, rounds: 0, stopwatch: true },
   { id: "custom", name: "Personnalisé", work: 45, rest: 15, rounds: 6, custom: true },
 ];
