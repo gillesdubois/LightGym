@@ -15,19 +15,19 @@ Most workout apps make you pick every exercise from a built-in library. If your 
 LightGym sits in between. You write the way you would in a notebook:
 
 ```
-Tractions +12kg 4x [5-6] : 6,5,4,4
+Pull-ups +12kg 4x [5-6] : 6,5,4,4
 ```
 
 The app reads the exercise name, load, number of sets, target range and your results, and highlights the sets that reach the top of the range. It never rejects a line: anything it doesn't understand is kept as a note.
 
 <p align="center">
-  <img src="docs/screenshots/semaine.png" width="220" alt="Week view: done and planned sessions, cycling and running distance">
-  <img src="docs/screenshots/seance.png" width="220" alt="Session in progress: supersets, logged sets and rest timer">
-  <img src="docs/screenshots/chrono.png" width="220" alt="Jump rope interval timer, 60 s work / 20 s rest">
+  <img src="docs/screenshots/week.png" width="220" alt="Week view: done and planned sessions, cycling and running distance">
+  <img src="docs/screenshots/session.png" width="220" alt="Session in progress: supersets, logged sets and rest timer">
+  <img src="docs/screenshots/timer.png" width="220" alt="Jump rope interval timer, 60 s work / 20 s rest">
 </p>
 <p align="center">
-  <img src="docs/screenshots/calendrier.png" width="220" alt="Monthly calendar of sessions and activities">
-  <img src="docs/screenshots/exercice.png" width="220" alt="Exercise history with its progress curve">
+  <img src="docs/screenshots/calendar.png" width="220" alt="Monthly calendar of sessions and activities">
+  <img src="docs/screenshots/exercise.png" width="220" alt="Exercise history with its progress curve">
   <img src="docs/screenshots/import.png" width="220" alt="Notes import: preview of the recognised days">
 </p>
 
@@ -52,27 +52,31 @@ The app reads the exercise name, load, number of sets, target range and your res
 
 ## Your data stays with you
 
-There is no account, no server and no tracking. Everything is stored in your device's browser. You can export and restore a JSON backup from Outils → Sauvegarde (Tools → Backup), which is also how you move between devices.
+There is no account, no server and no tracking. Everything is stored in your device's browser. You can export and restore a JSON backup from Tools → Backup, which is also how you move between devices.
 
 On iPhone or iPad, open the app in Safari, then Share → Add to Home Screen. It then opens full screen and works offline, and Safari no longer clears its data after 7 days without a visit.
+
+## English or French
+
+The interface is available in English and French. It follows your device language by default; you can change it in Tools → Settings. Notes and programs are read in both languages whatever the setting, so `Mon 05/10` and `Lun 05/10`, `Other:` and `Autre :`, `rest 1:30` and `repos 1:30` all work. Markdown exports and review prompts use the interface language.
 
 ## Writing your notes
 
 There is no strict syntax, just a few markers:
 
 ```
-# Semaine du 05/10
+# Week of 05/10
 
-## Lun 05/10 — Upper body
-* Tractions +12kg 4x [5-6] : 6,5,4,4
-* Front lever one-leg 5x [8-12s] : G 12s, D 12s, G 11s, D 11s
+## Mon 05/10 — Upper body
+* Pull-ups +12kg 4x [5-6] : 6,5,4,4
+* Front lever one-leg 5x [8-12s] : L 12s, R 12s, L 11s, R 11s
 * Pistol / Goblet squat 20kg 4x [5-6 / 8-10] : 6/10, 6/10, 5/10
-Autre :
-- Vélo 7 km
-Note : a bit tired.
+Other:
+- Bike 7 km
+Note: a bit tired.
 
-## Mar 06/10 — Cardio
-- Running 3 km en 19 min
+## Tue 06/10 — Cardio
+- Running 3 km in 19 min
 ```
 
 | Marker | Meaning |
@@ -81,31 +85,31 @@ Note : a bit tired.
 | `[5-6]`, `[8-12s]` | target (reps or seconds) |
 | `+12kg`, `20kg` | load |
 | `6,5,4,4` | result of each set |
-| `D 12s`, `G 11s` | right (droite) or left (gauche) side |
+| `L 12s`, `R 11s` | left or right side (`G`/`D` in French) |
 | `6/10` | superset: exercise 1 / exercise 2 |
-| `Autre :` | outside activities |
-| `Note :` | free text |
+| `Other:` | outside activities (cycling, running, hiking, climbing…) |
+| `Note:` | free text |
 
-Dates are written day first (`05/10` is 5 October). When the year is missing, the importer picks the one that keeps the date out of the future. The app's Markdown export can be imported back as is.
+Dates are written day first (`05/10` is 5 October). When the year is missing, the importer picks the one that keeps the date out of the future. A day can also start with `Mon 05/10:` or `Monday 14` when the week is given, and the older `4x Pull-ups 12kg : Target 4-6` followed by `- 6,5,5,4` is understood too. The app's Markdown export can be imported back as is.
 
 ## Writing your program
 
 ```
-## Lundi — Pull
-Bloc 1 · skill | repos 2:30
+## Monday — Pull
+Block 1 · skill | rest 2:30
 - Front lever one-leg 5x [8-12s]
-Superset A · noyau | 4 tours | repos 1:30
+Superset A · core | 4 rounds | rest 1:30
 - Strict pull-ups [8-10]
 - Kettlebell swing 20 kg [15]
-Superset B · bonus | 3 tours | repos 1:30
+Superset B · bonus | 3 rounds | rest 1:30
 - Ring rows [10-12]
 - Gorilla row KB [8-10 / arm]
 
-## Mardi — Cardio
+## Tuesday — Cardio
 - Running : 3-4 km easy
 ```
 
-A heading that starts with a weekday suggests that session on that day. Without a weekday, the template is available any time. `noyau` marks a core block, `bonus` an optional one, `tours` the number of rounds and `repos` the rest time. An example program loads on first launch.
+A heading that starts with a weekday suggests that session on that day. Without a weekday, the template is available any time. `core` marks a block you always do, `bonus` one you can skip, `skill` a technique block that gets the longer rest. An example program loads on first launch.
 
 ## Running the project
 
@@ -126,6 +130,6 @@ The app is a static site. On [Vercel](https://vercel.com), import the repository
 
 ## Current limits
 
-- The interface and the note markers are in French for now. An English interface and English markers (`Mon`, `Other:`, `rest`, `rounds`) are in progress.
+- Dates are always day first (`05/10` is 5 October), including in English.
 - There is no automatic sync between devices; the JSON backup is the way to move data.
 - Progress curves only count single values. A per-side value such as `4/4` is shown but not plotted.
