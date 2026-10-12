@@ -1,129 +1,131 @@
 <p align="center">
-  <img src="public/icon.svg" width="88" alt="Logo LightGym : un chronomètre ouvert autour d'un L">
+  <img src="public/icon.svg" width="88" alt="LightGym logo: an open stopwatch ring around an L">
 </p>
 
 <h1 align="center">LightGym</h1>
 
-<p align="center">Un carnet d'entraînement qui lit tes notes telles que tu les écris.</p>
+<p align="center">A training log that reads your notes the way you write them.</p>
+
+<p align="center"><a href="https://lightgym.vercel.app/"><b>Open the app → lightgym.vercel.app</b></a></p>
 
 ---
 
-La plupart des apps de musculation demandent de choisir chaque exercice dans une bibliothèque. Si ton mouvement n'y est pas (une variante de front lever, un superset maison, une séance d'escalade improvisée), il faut tricher ou renoncer. À l'autre extrême, la note sur téléphone accepte tout mais ne t'aide ni pendant la séance (repos, chronos) ni après (progression, historique).
+Most workout apps make you pick every exercise from a built-in library. If your movement isn't there (a front lever variation, a home-made superset, an unplanned climbing session), you either fake it or give up. At the other end, a phone note accepts anything but does nothing for you during the session (rest, timers) or after it (progress, history).
 
-LightGym se place entre les deux. Tu écris comme dans un carnet :
+LightGym sits in between. You write the way you would in a notebook:
 
 ```
 Tractions +12kg 4x [5-6] : 6,5,4,4
 ```
 
-L'app y retrouve le nom, la charge, le nombre de séries, l'objectif et tes résultats, et surligne les séries qui atteignent le haut de l'objectif. Elle ne refuse jamais une ligne : ce qu'elle ne comprend pas reste une note.
+The app reads the exercise name, load, number of sets, target range and your results, and highlights the sets that reach the top of the range. It never rejects a line: anything it doesn't understand is kept as a note.
 
 <p align="center">
-  <img src="docs/screenshots/semaine.png" width="220" alt="Vue semaine : séances faites et prévues, kilomètres de vélo et de course">
-  <img src="docs/screenshots/seance.png" width="220" alt="Séance en cours : supersets, séries saisies et minuteur de repos">
-  <img src="docs/screenshots/chrono.png" width="220" alt="Chrono d'intervalles corde à sauter 60/20">
+  <img src="docs/screenshots/semaine.png" width="220" alt="Week view: done and planned sessions, cycling and running distance">
+  <img src="docs/screenshots/seance.png" width="220" alt="Session in progress: supersets, logged sets and rest timer">
+  <img src="docs/screenshots/chrono.png" width="220" alt="Jump rope interval timer, 60 s work / 20 s rest">
 </p>
 <p align="center">
-  <img src="docs/screenshots/calendrier.png" width="220" alt="Calendrier mensuel des séances et activités">
-  <img src="docs/screenshots/exercice.png" width="220" alt="Historique d'un exercice avec sa courbe de progression">
-  <img src="docs/screenshots/import.png" width="220" alt="Import de notes : aperçu des journées reconnues">
+  <img src="docs/screenshots/calendrier.png" width="220" alt="Monthly calendar of sessions and activities">
+  <img src="docs/screenshots/exercice.png" width="220" alt="Exercise history with its progress curve">
+  <img src="docs/screenshots/import.png" width="220" alt="Notes import: preview of the recognised days">
 </p>
 
-## Ce que l'app fait
+## What it does
 
-**Pendant la séance**
-- Ton programme, écrit en texte, propose chaque jour sa séance : blocs, supersets, objectifs et repos.
-- Valider une série lance le minuteur de repos, avec bips à 3, 2, 1 et vibration à la fin.
-- Un chrono de hold mesure un gainage ou un front lever et remplit la valeur tout seul.
-- Les blocs « bonus » se passent en un tap quand le temps manque.
-- L'écran reste allumé pendant l'effort, plus besoin de déverrouiller le téléphone entre deux séries.
+**During a session**
+- Your program, written as plain text, suggests each day's session: blocks, supersets, targets and rest times.
+- Logging a set starts the rest timer, with 3-2-1 beeps and a vibration at the end.
+- A hold timer measures a plank or a front lever and fills in the value for you.
+- "Bonus" blocks can be skipped with one tap when time runs short.
+- The screen stays awake while you train, so you don't unlock your phone between sets.
 
-**À côté des séances**
-- Intervalles : corde 60/20, tabata, HIIT, EMOM, réglages personnalisés et chronomètre.
-- Les activités externes (vélo, running, rando, escalade, yoga…) s'ajoutent en deux taps, avec durée, distance et allure.
+**Around your sessions**
+- Interval timers: jump rope 60/20, tabata, HIIT, EMOM, custom settings, plus a stopwatch.
+- Outside activities (cycling, running, hiking, climbing, yoga…) take two taps to add, with duration, distance and pace.
 
-**Après**
-- Un calendrier mensuel montre les séances, les activités et les kilomètres.
-- Chaque exercice a son historique et sa courbe ; les supersets sont séparés en deux exercices.
-- L'import de masse reprend des semaines de notes collées telles quelles, avec un aperçu avant d'enregistrer.
-- La semaine s'exporte en Markdown (compatible Obsidian), ou en prompt de bilan prêt à coller dans un assistant IA, avec ton contexte, ton programme et ta progression.
+**Afterwards**
+- A monthly calendar shows sessions, activities and distances.
+- Each exercise has its own history and curve; supersets are split into their two exercises.
+- Bulk import takes weeks of notes pasted as they are, with a preview before anything is saved.
+- A week exports to Markdown (Obsidian-friendly), or to a review prompt ready to paste into an AI assistant, with your context, program and progress.
 
-## Tes données restent chez toi
+## Your data stays with you
 
-Il n'y a ni compte, ni serveur, ni suivi. Tout est stocké dans le navigateur de ton appareil. Une sauvegarde JSON s'exporte et se restaure depuis Outils → Sauvegarde, ce qui sert aussi à passer d'un appareil à l'autre.
+There is no account, no server and no tracking. Everything is stored in your device's browser. You can export and restore a JSON backup from Outils → Sauvegarde (Tools → Backup), which is also how you move between devices.
 
-Sur iPhone ou iPad, ouvre l'app dans Safari puis Partager → Sur l'écran d'accueil. Elle s'ouvre alors en plein écran, fonctionne hors connexion, et Safari ne peut plus effacer ses données au bout de 7 jours sans visite.
+On iPhone or iPad, open the app in Safari, then Share → Add to Home Screen. It then opens full screen and works offline, and Safari no longer clears its data after 7 days without a visit.
 
-## Écrire ses notes
+## Writing your notes
 
-L'app ne demande pas de syntaxe stricte, seulement quelques repères :
+There is no strict syntax, just a few markers:
 
 ```
 # Semaine du 05/10
 
-## Lun 05/10 — Haut du corps
+## Lun 05/10 — Upper body
 * Tractions +12kg 4x [5-6] : 6,5,4,4
 * Front lever one-leg 5x [8-12s] : G 12s, D 12s, G 11s, D 11s
 * Pistol / Goblet squat 20kg 4x [5-6 / 8-10] : 6/10, 6/10, 5/10
 Autre :
 - Vélo 7 km
-Note : un peu fatigué.
+Note : a bit tired.
 
 ## Mar 06/10 — Cardio
 - Running 3 km en 19 min
 ```
 
-| Repère | Sens |
+| Marker | Meaning |
 |---|---|
-| `4x` | nombre de séries |
-| `[5-6]`, `[8-12s]` | objectif (répétitions ou secondes) |
-| `+12kg`, `20kg` | charge |
-| `6,5,4,4` | résultat de chaque série |
-| `D 12s`, `G 11s` | côté droit ou gauche |
-| `6/10` | superset : exercice 1 / exercice 2 |
-| `Autre :` | activités hors séance |
-| `Note :` | texte libre |
+| `4x` | number of sets |
+| `[5-6]`, `[8-12s]` | target (reps or seconds) |
+| `+12kg`, `20kg` | load |
+| `6,5,4,4` | result of each set |
+| `D 12s`, `G 11s` | right (droite) or left (gauche) side |
+| `6/10` | superset: exercise 1 / exercise 2 |
+| `Autre :` | outside activities |
+| `Note :` | free text |
 
-L'import comprend aussi `Lun 05/10 :`, `Lundi 14` (quand la semaine est indiquée) et le format `4x Tractions 12kg : Objectif 4-6` suivi de `- 6,5,5,4`. L'export Markdown de l'app se réimporte tel quel.
+Dates are written day first (`05/10` is 5 October). When the year is missing, the importer picks the one that keeps the date out of the future. The app's Markdown export can be imported back as is.
 
-## Écrire son programme
+## Writing your program
 
 ```
 ## Lundi — Pull
 Bloc 1 · skill | repos 2:30
 - Front lever one-leg 5x [8-12s]
 Superset A · noyau | 4 tours | repos 1:30
-- Tractions strictes [8-10]
-- Swing KB 20 kg [15]
+- Strict pull-ups [8-10]
+- Kettlebell swing 20 kg [15]
 Superset B · bonus | 3 tours | repos 1:30
-- Rowing [10-12]
-- Gorilla row KB [8-10 / bras]
+- Ring rows [10-12]
+- Gorilla row KB [8-10 / arm]
 
 ## Mardi — Cardio
-- Running : 3-4 km facile
+- Running : 3-4 km easy
 ```
 
-Un titre qui commence par un jour propose la séance ce jour-là ; sans jour, le gabarit reste disponible à tout moment. Un programme d'exemple se charge au premier lancement.
+A heading that starts with a weekday suggests that session on that day. Without a weekday, the template is available any time. `noyau` marks a core block, `bonus` an optional one, `tours` the number of rounds and `repos` the rest time. An example program loads on first launch.
 
-## Lancer le projet
+## Running the project
 
-Il faut Node.js 20 ou plus.
+Requires Node.js 20 or later.
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # tests de lecture des notes et du programme
-npm run build    # vérification des types et build dans dist/
+npm test         # parser tests (notes and program)
+npm run build    # type check and production build into dist/
 ```
 
-Stack : Vite, React et TypeScript, avec vite-plugin-pwa pour l'installation et le hors-ligne. Il n'y a aucun backend. La logique de lecture est dans `src/lib`, les écrans dans `src/views`.
+Stack: Vite, React and TypeScript, with vite-plugin-pwa for installation and offline use. There is no backend. Parsing logic lives in `src/lib`, screens in `src/views`.
 
-## Déployer
+## Deploying
 
-Le site est statique et n'a besoin d'aucun serveur. Sur [Vercel](https://vercel.com), il suffit d'importer le dépôt : le préréglage Vite est détecté, avec le build `npm run build` et la sortie `dist`. Netlify, Cloudflare Pages ou GitHub Pages conviennent aussi.
+The app is a static site. On [Vercel](https://vercel.com), import the repository: the Vite preset is detected, with `npm run build` as the build command and `dist` as the output folder. Netlify, Cloudflare Pages or GitHub Pages work too.
 
-## Limites actuelles
+## Current limits
 
-- Il n'y a pas de synchronisation automatique entre appareils. On passe de l'un à l'autre par la sauvegarde JSON.
-- L'interface n'existe qu'en français.
-- La courbe de progression ne compte que les valeurs simples ; une valeur par côté comme `4/4` s'affiche mais n'entre pas dans la courbe.
+- The interface and the note markers are in French for now. An English interface and English markers (`Mon`, `Other:`, `rest`, `rounds`) are in progress.
+- There is no automatic sync between devices; the JSON backup is the way to move data.
+- Progress curves only count single values. A per-side value such as `4/4` is shown but not plotted.
