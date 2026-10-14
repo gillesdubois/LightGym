@@ -8,6 +8,9 @@
 
 <p align="center"><a href="https://lightgym.vercel.app/"><b>Open the app → lightgym.vercel.app</b></a></p>
 
+> [!NOTE]
+> This is a personal project, vibe-coded for my own use. It brings together, in a simpler form, a few apps I like: Calistree for training, Seconds Pro for interval timers, and plain-text notes for logging. The app is public and free to use, but I make no promise that it works, that it is complete, or that it will keep evolving.
+
 ---
 
 Most workout apps make you pick every exercise from a built-in library. If your movement isn't there (a front lever variation, a home-made superset, an unplanned climbing session), you either fake it or give up. At the other end, a phone note accepts anything but does nothing for you during the session (rest, timers) or after it (progress, history).
