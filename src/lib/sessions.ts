@@ -2,10 +2,11 @@ import type { Activity } from "./activities";
 import { addDays, dayLabel, ddmm, type Lang, mondayOf } from "./dates";
 import { type ExerciseEntry, parseLine, splitExercises } from "./parse";
 import type { Template } from "./program";
-import { type Block, type Data, type Session, uid } from "./store";
+import { type Block, type Data, type PlanItem, type Session, uid } from "./store";
 
-export function createSession(date: string, template?: Template | null, source: Session["source"] = "live"): Session {
+export function createSession(date: string, template?: Template | null, source: Session["source"] = "live", planId?: string): Session {
   return {
+    planId,
     id: uid(),
     date,
     title: template?.title ?? "",
@@ -81,6 +82,57 @@ export function indexExercises(sessions: Session[]): ExerciseIndex[] {
     }
   }
   return [...map.values()].sort((a, b) => b.entries[b.entries.length - 1].date.localeCompare(a.entries[a.entries.length - 1].date));
+}
+
+/* ---------- Planning ---------- */
+
+export const sessionForPlan = (data: Data, planId: string) => data.sessions.find((s) => s.planId === planId);
+
+/** Blocs planifiés un jour donné, dans l'ordre d'ajout. */
+export const planOn = (data: Data, date: string): PlanItem[] => data.plan.filter((p) => p.date === date);
+
+/** Blocs planifiés pas encore commencés. */
+export const pendingPlanOn = (data: Data, date: string): PlanItem[] => planOn(data, date).filter((p) => !sessionForPlan(data, p.id));
+
+export type PlanRepeat = "once" | "weekdays" | "everyday";
+
+/** Planifie un bloc ; "weekdays" et "everyday" couvrent la semaine (lundi-dimanche) de la date choisie, à partir de cette date. */
+export function addPlan(data: Data, date: string, template: Pick<Template, "id" | "title">, repeat: PlanRepeat = "once"): number {
+  const monday = mondayOf(date);
+  const dates = repeat === "once"
+    ? [date]
+    : Array.from({ length: repeat === "weekdays" ? 5 : 7 }, (_, i) => addDays(monday, i)).filter((d) => d >= date);
+  let added = 0;
+  for (const d of dates) {
+    if (data.plan.some((p) => p.date === d && p.templateId === template.id)) continue;
+    data.plan.push({ id: uid(), date: d, templateId: template.id, title: template.title });
+    added++;
+  }
+  return added;
+}
+
+/** Place sur la semaine les blocs du programme dont le titre commence par un jour (la « semaine type »). */
+export function fillWeekFromProgram(data: Data, monday: string, templates: Template[]): number {
+  let added = 0;
+  for (const t of templates) {
+    if (t.weekday === null) continue;
+    added += addPlan(data, addDays(monday, t.weekday), t);
+  }
+  return added;
+}
+
+export function movePlan(data: Data, planId: string, date: string): void {
+  const p = data.plan.find((x) => x.id === planId);
+  if (!p) return;
+  p.date = date;
+  // Une séance déjà commencée suit son bloc.
+  const s = data.sessions.find((x) => x.planId === planId);
+  if (s) s.date = date;
+}
+
+export function removePlan(data: Data, planId: string): void {
+  data.plan = data.plan.filter((p) => p.id !== planId);
+  for (const s of data.sessions) if (s.planId === planId) s.planId = undefined;
 }
 
 /* ---------- Markdown ---------- */

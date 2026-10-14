@@ -87,7 +87,8 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
       const dm = name.match(DAY_HEAD_RE);
       const wd = dm ? dayIndexFromName(dm[1]) : null;
       const title = dm ? (dm[2]?.trim() || name) : name;
-      let id = slug(name) || `template-${templates.length + 1}`;
+      // L'id suit le titre, pas le jour : déplacer ou retirer le jour du titre garde les planifications.
+      let id = slug(title) || `template-${templates.length + 1}`;
       while (templates.some((t) => t.id === id)) id += "-2";
       tpl = { id, name, title, weekday: wd, blocks: [] };
       templates.push(tpl);

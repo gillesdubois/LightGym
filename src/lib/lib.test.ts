@@ -3,7 +3,7 @@ import { parseDurationMin, parseDistanceKm, detectType } from "./activities";
 import { parseImport } from "./importer";
 import { allAtTop, parseLine, splitExercises } from "./parse";
 import { EXAMPLE_PROGRAM, parseProgram, placeholderFor } from "./program";
-import { createSession, sessionLines, weekMarkdown, buildPrompt } from "./sessions";
+import { addPlan, buildPrompt, createSession, fillWeekFromProgram, movePlan, pendingPlanOn, removePlan, sessionLines, weekMarkdown } from "./sessions";
 import { migrate } from "./store";
 
 let n = 0;
@@ -301,5 +301,50 @@ Extra: 1h30 bouldering`;
     expect(d.sessions[0].activities[0].type).toBe("commute");
     expect(d.sessions[0].blocks[0].tag).toBe("core");
     expect(d.settings.lang).toBe("auto");
+  });
+});
+
+describe("planning", () => {
+  const settings = { defaultRest: 90, skillRest: 150 };
+  const yoga = { id: "yoga", title: "Yoga" };
+
+  it("planifie un bloc sur un jour ou sur la semaine", () => {
+    const d = migrate({});
+    expect(addPlan(d, "2026-10-14", yoga)).toBe(1);
+    expect(addPlan(d, "2026-10-14", yoga)).toBe(0);
+    // Mercredi 14 : du mercredi au vendredi, puis jusqu'au dimanche.
+    expect(addPlan(d, "2026-10-14", yoga, "weekdays")).toBe(2);
+    expect(addPlan(d, "2026-10-14", yoga, "everyday")).toBe(2);
+    expect(d.plan.map((p) => p.date).sort()).toEqual(["2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18"]);
+  });
+
+  it("place la semaine type sans doublon", () => {
+    const { templates } = parseProgram(EXAMPLE_PROGRAM.fr, settings);
+    const d = migrate({});
+    expect(fillWeekFromProgram(d, "2026-10-12", templates)).toBe(4);
+    expect(fillWeekFromProgram(d, "2026-10-12", templates)).toBe(0);
+    expect(d.plan.map((p) => [p.date, p.templateId])).toContainEqual(["2026-10-16", "full-body"]);
+  });
+
+  it("garde l'id d'un bloc quand on retire son jour du titre", () => {
+    const a = parseProgram("## Lundi — Pull\n- Tractions [8-10]", settings).templates[0];
+    const b = parseProgram("## Pull\n- Tractions [8-10]", settings).templates[0];
+    expect(a.id).toBe(b.id);
+    expect(a.weekday).toBe(0);
+    expect(b.weekday).toBeNull();
+  });
+
+  it("déplace un bloc et sa séance, le retire du planning", () => {
+    const d = migrate({});
+    addPlan(d, "2026-10-14", yoga);
+    const p = d.plan[0];
+    const s = createSession(p.date, null, "live", p.id);
+    d.sessions.push(s);
+    expect(pendingPlanOn(d, "2026-10-14")).toEqual([]);
+    movePlan(d, p.id, "2026-10-15");
+    expect(d.sessions[0].date).toBe("2026-10-15");
+    removePlan(d, p.id);
+    expect(d.plan).toEqual([]);
+    expect(d.sessions[0].planId).toBeUndefined();
   });
 });

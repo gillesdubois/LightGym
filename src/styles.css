@@ -47,9 +47,15 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Coquille d'app : la page ne défile jamais, seul .view défile. En-tête et onglets restent en place sur iOS. */
+html, body, #root { height: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow: hidden; }
 body {
   margin: 0;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
   background-color: var(--paper);
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
@@ -71,10 +77,16 @@ p { margin: 0; }
 .cap { text-transform: capitalize; }
 
 /* ---------- Structure ---------- */
-.app { max-width: 620px; margin: 0 auto; min-height: 100vh; }
+.app {
+  height: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
 .appbar {
-  position: sticky;
-  top: 0;
+  flex: none;
+  position: relative;
   z-index: 10;
   display: flex;
   align-items: flex-end;
@@ -109,19 +121,24 @@ p { margin: 0; }
 .wake.on::before { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 .view {
-  padding: 14px 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 96px);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  padding: 14px 16px 112px;
+  scroll-padding-top: 12px;
 }
 .stack { display: grid; gap: 12px; }
 .banner { background: var(--warn-soft); color: var(--warn); padding: 10px 16px; font-size: 14px; }
 
 .tabbar {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
+  flex: none;
+  position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  max-width: 620px;
-  margin: 0 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -211,9 +228,13 @@ p { margin: 0; }
   padding: 9px 10px;
   font-size: 16px; /* évite le zoom automatique d'iOS */
 }
-.field.sm { width: auto; padding: 5px 8px; font-size: 14px; }
+.field.sm { width: auto; max-width: 100%; padding: 6px 8px; }
 textarea.field { resize: vertical; min-height: 70px; line-height: 1.5; }
-.field.mono { font-family: var(--f-mono); font-size: 15px; }
+.field.mono { font-family: var(--f-mono); }
+/* iOS : un champ date garde sinon sa largeur native et déborde de la grille. */
+input[type="date"].field { -webkit-appearance: none; appearance: none; display: block; min-height: 42px; }
+input[type="date"].field::-webkit-date-and-time-value { text-align: left; }
+select.field { -webkit-appearance: none; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
 label.lbl { font-size: 12px; color: var(--muted); display: grid; gap: 4px; min-width: 0; }
 details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 details[open] > summary { margin-bottom: 8px; }
@@ -440,3 +461,41 @@ pre.out {
 @media (prefers-reduced-motion: reduce) {
   .ring .fg { transition: none; }
 }
+
+/* ---------- Aujourd'hui et planning ---------- */
+.block { display: block; }
+.tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-card { border-color: var(--work); box-shadow: inset 3px 0 0 var(--work); }
+.plan-card { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); min-width: 0; }
+.plan-main {
+  display: grid; gap: 2px; text-align: left; min-width: 0;
+  border: 0; background: none; padding: 0;
+}
+.plan-main b { font-size: 17px; overflow-wrap: anywhere; }
+.plan-main:disabled { cursor: default; }
+.plan-card .row.nowrap .field { flex: 1 1 auto; width: auto; min-width: 0; }
+.upcoming { display: grid; gap: 4px; }
+.up-row {
+  display: flex; align-items: baseline; gap: 10px; text-align: left; min-width: 0;
+  border: 0; border-bottom: 1px dashed var(--line); background: none; padding: 8px 2px;
+}
+.up-row:last-child { border-bottom: 0; }
+.up-title { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.tpl[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.m-plan { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
+
+/* ---------- Séance : un bloc à la fois ---------- */
+.blk.focused { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); scroll-margin-top: 12px; }
+.pair.big { font-size: 18px; font-weight: 600; }
+.pair.big .target { font-size: 14px; font-weight: 400; }
+.blk-row {
+  display: grid; gap: 4px; text-align: left; width: 100%; min-width: 0;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 10px 12px;
+  scroll-margin-top: 12px;
+}
+.blk-row-head { display: flex; justify-content: space-between; gap: 8px; }
+.blk-row-name { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.blk-row .chip { font-size: 12px; padding: 2px 6px; }
+.blk-row.done { background: transparent; }
+.blk-row.done .blk-row-name { text-decoration: none; }
+.blk-row.skipped { opacity: 0.55; }

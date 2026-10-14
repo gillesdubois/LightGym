@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import type { Nav } from "../App";
-import { Chip, SessionBody } from "../components/common";
+import { Chip, SessionBody, useTemplates } from "../components/common";
+import PlanCard from "../components/PlanCard";
 import { isCycling } from "../lib/activities";
-import { addDays, DAYS, dayLabel, ddmm, ddmmyyyy, fromISO, MONTHS, pad, todayISO, toISO, weekday } from "../lib/dates";
+import { addDays, DAYS, dayLabel, ddmm, ddmmyyyy, fromISO, mondayOf, MONTHS, pad, todayISO, toISO, weekday } from "../lib/dates";
+import { toast } from "../lib/device";
 import { useT } from "../lib/i18n";
 import { bestOf } from "../lib/parse";
-import { type ExerciseIndex, hasTraining, indexExercises, isEmpty } from "../lib/sessions";
-import type { Data, Session } from "../lib/store";
+import { type ExerciseIndex, fillWeekFromProgram, hasTraining, indexExercises, isEmpty, pendingPlanOn } from "../lib/sessions";
+import { type Data, type Session, update } from "../lib/store";
 
-export default function HistoryView({ data, nav, initialDate }: { data: Data; nav: Nav; initialDate: string | null }) {
+export default function CalendarView({ data, nav, initialDate }: { data: Data; nav: Nav; initialDate: string | null }) {
   const t = useT();
   const [mode, setMode] = useState<"cal" | "ex">("cal");
   return (
@@ -29,6 +31,8 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
   const today = todayISO();
   const [selected, setSelected] = useState(initialDate ?? today);
   const [month, setMonth] = useState(() => selected.slice(0, 7));
+  const { templates } = useTemplates(data);
+  const byId = new Map(templates.map((x) => [x.id, x]));
   const first = `${month}-01`;
   const firstDate = fromISO(first);
   const daysInMonth = new Date(firstDate.getFullYear(), firstDate.getMonth() + 1, 0).getDate();
@@ -85,42 +89,60 @@ function Calendar({ data, nav, initialDate }: { data: Data; nav: Nav; initialDat
             const list = byDate.get(date) ?? [];
             const train = list.some(hasTraining);
             const act = list.some((s) => s.activities.length);
+            const planned = pendingPlanOn(data, date).length > 0;
             return (
               <button
                 key={date}
                 type="button"
                 className={`cal-day ${date === selected ? "sel" : ""} ${date === today ? "today" : ""} ${list.length ? "has" : ""}`}
                 aria-pressed={date === selected}
-                aria-label={`${dayLabel(date, t.lang)}${train ? `, ${t.history.session}` : ""}${act ? `, ${t.history.activity}` : ""}`}
+                aria-label={`${dayLabel(date, t.lang)}${train ? `, ${t.history.session}` : ""}${act ? `, ${t.history.activity}` : ""}${planned ? `, ${t.history.planned}` : ""}`}
                 onClick={() => setSelected(date)}
               >
                 <span className="num">{fromISO(date).getDate()}</span>
                 <span className="marks">
                   {train && <i className="m-train" />}
                   {act && <i className="m-act" />}
+                  {planned && <i className="m-plan" />}
                 </span>
               </button>
             );
           })}
         </div>
-        <div className="legend small"><span><i className="m-train" /> {t.history.session}</span><span><i className="m-act" /> {t.history.activity}</span></div>
+        <div className="legend small">
+          <span><i className="m-train" /> {t.history.session}</span>
+          <span><i className="m-act" /> {t.history.activity}</span>
+          <span><i className="m-plan" /> {t.history.planned}</span>
+        </div>
       </div>
 
       <section className="card">
-        <div className="row between">
-          <b>{dayLabel(selected, t.lang)}</b>
-          <span className="row">
-            <button type="button" className="btn sm" onClick={() => nav.startSession(selected, null)}>{t.history.log}</button>
-            <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(selected)}>{t.history.plusActivity}</button>
-          </span>
-        </div>
-        {dayList.length ? dayList.map((s) => (
+        <b>{dayLabel(selected, t.lang)}</b>
+        {pendingPlanOn(data, selected).map((p) => <PlanCard key={p.id} item={p} template={byId.get(p.templateId)} nav={nav} />)}
+        {dayList.map((s) => (
           <div key={s.id} className="day-session">
             {s.title && <div className="blk-label">{s.title}</div>}
             <SessionBody session={s} />
             <div className="row"><button type="button" className="btn sm" onClick={() => nav.openSession(s.id)}>{t.history.open}</button></div>
           </div>
-        )) : <span className="small">{t.history.nothing}</span>}
+        ))}
+        {!dayList.length && !pendingPlanOn(data, selected).length && <span className="small">{t.history.nothing}</span>}
+        <div className="row">
+          <button type="button" className="btn sm" onClick={() => nav.openPlan(selected)}>{t.today.planBlock}</button>
+          <button type="button" className="btn sm ghost" onClick={() => nav.startSession(selected, null)}>{t.history.log}</button>
+          <button type="button" className="btn sm ghost" onClick={() => nav.openActivity(selected)}>{t.history.plusActivity}</button>
+        </div>
+        {templates.some((x) => x.weekday !== null) && (
+          <button
+            type="button"
+            className="btn sm ghost start"
+            onClick={() => {
+              let n = 0;
+              update((d) => { n = fillWeekFromProgram(d, mondayOf(selected), templates); });
+              toast(t.today.filled(n));
+            }}
+          >{t.today.fillWeek}</button>
+        )}
       </section>
     </>
   );

@@ -21,6 +21,17 @@ export interface Session {
   status: "live" | "done";
   startedAt?: number;
   source: "live" | "import" | "manual";
+  /** Élément du planning dont la séance est issue. */
+  planId?: string;
+}
+
+/** Un bloc du programme placé sur un jour. Fait dès qu'une séance porte son id. */
+export interface PlanItem {
+  id: string;
+  date: string;
+  templateId: string;
+  /** Titre au moment de la planification, affiché si le bloc disparaît du programme. */
+  title: string;
 }
 
 export type LangSetting = "auto" | "fr" | "en";
@@ -35,6 +46,7 @@ export interface Settings {
 export interface Data {
   version: 1;
   sessions: Session[];
+  plan: PlanItem[];
   programText: string;
   context: string;
   settings: Settings;
@@ -48,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = { defaultRest: 90, skillRest: 150, tar
 const emptyData = (): Data => ({
   version: 1,
   sessions: [],
+  plan: [],
   programText: "",
   context: "",
   settings: { ...DEFAULT_SETTINGS },
@@ -79,6 +92,7 @@ function normalizeSession(s: Partial<Session>): Session {
     status: s.status === "live" ? "live" : "done",
     startedAt: s.startedAt,
     source: s.source ?? "manual",
+    planId: s.planId,
   };
 }
 
@@ -89,6 +103,9 @@ export function migrate(raw: unknown): Data {
   return {
     version: 1,
     sessions: arr<Partial<Session>>(d.sessions).map(normalizeSession),
+    plan: arr<Partial<PlanItem>>(d.plan)
+      .filter((p) => p.date && p.templateId)
+      .map((p) => ({ id: p.id || uid(), date: p.date!, templateId: p.templateId!, title: p.title ?? "" })),
     programText: typeof d.programText === "string" ? d.programText : base.programText,
     context: typeof d.context === "string" ? d.context : base.context,
     settings: { ...base.settings, ...(d.settings ?? {}) },
