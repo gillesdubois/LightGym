@@ -3,7 +3,7 @@ import { parseDurationMin, parseDistanceKm, detectType } from "./activities";
 import { parseImport } from "./importer";
 import { allAtTop, parseLine, splitExercises } from "./parse";
 import { EXAMPLE_PROGRAM, parseDuration, parseProgram, placeholderFor, timedTotal } from "./program";
-import { addPlan, buildPrompt, createSession, fillWeekFromProgram, movePlan, pendingPlanOn, removePlan, sessionLines, weekMarkdown } from "./sessions";
+import { addPlan, applyImport, beginSession, buildPrompt, createSession, fillWeekFromProgram, moveSession, movePlan, pendingPlanOn, removePlan, sessionLines, weekMarkdown } from "./sessions";
 import { migrate } from "./store";
 
 let n = 0;
@@ -346,6 +346,60 @@ describe("planning", () => {
     removePlan(d, p.id);
     expect(d.plan).toEqual([]);
     expect(d.sessions[0].planId).toBeUndefined();
+  });
+});
+
+describe("non-régression", () => {
+  it("remplace une date sans effacer une autre journée du même import", () => {
+    const d = migrate({ sessions: [{ id: "old", date: "2026-10-05", source: "import", lines: ["Tractions 4x : 5,5,5,5"] }] });
+    const { days } = parseImport("# Semaine du 05/10/2026\n## Lun 05/10 — Matin\n* Tractions 4x : 6,6,6,6\n## Lun 05/10 — Soir\n* Pompes 3x : 20,20,20", id);
+    expect(applyImport(d, days, ["replace", "replace"])).toBe(2);
+    expect(d.sessions.map((s) => s.title).sort()).toEqual(["Matin", "Soir"]);
+  });
+
+  it("garde une séance en cours et les autres dates lors d'un remplacement", () => {
+    const d = migrate({ sessions: [
+      { id: "live", date: "2026-10-05", status: "live", lines: ["Squat : 10"] },
+      { id: "other", date: "2026-10-06", source: "import", lines: ["Squat : 10"] },
+    ] });
+    const { days } = parseImport("## Lun 05/10/2026\n* Pompes : 20", id);
+    applyImport(d, days, ["replace"]);
+    expect(d.sessions.map((s) => s.id)).toEqual(expect.arrayContaining(["live", "other"]));
+    expect(applyImport(d, days, ["skip"])).toBe(0);
+    expect(d.sessions).toHaveLength(3);
+  });
+
+  it("termine toute séance restée en cours au démarrage d'une nouvelle", () => {
+    const d = migrate({ sessions: [
+      { id: "a", date: "2026-10-13", status: "live", lines: ["Squat : 10"] },
+      { id: "empty", date: "2026-10-13", status: "live" },
+      { id: "b", date: "2026-10-12", status: "done", lines: ["Squat : 8"] },
+    ], activeId: "b" });
+    const c = createSession("2026-10-14", null, "live");
+    beginSession(d, c);
+    expect(d.sessions.filter((s) => s.status === "live").map((s) => s.id)).toEqual([c.id]);
+    expect(d.sessions.find((s) => s.id === "a")?.status).toBe("done");
+    expect(d.sessions.some((s) => s.id === "empty")).toBe(false);
+    expect(d.activeId).toBe(c.id);
+  });
+
+  it("déplace le bloc planifié avec sa séance", () => {
+    const d = migrate({});
+    addPlan(d, "2026-10-14", { id: "yoga", title: "Yoga" });
+    const s = createSession("2026-10-14", null, "live", d.plan[0].id);
+    const free = createSession("2026-10-14", null, "live");
+    d.sessions.push(s, free);
+    moveSession(d, s.id, "2026-10-16");
+    expect(d.sessions[0].date).toBe("2026-10-16");
+    expect(d.plan[0].date).toBe("2026-10-16");
+    moveSession(d, free.id, "2026-10-17");
+    expect(d.sessions[1].date).toBe("2026-10-17");
+    expect(d.plan[0].date).toBe("2026-10-16");
+    // Lien vers un bloc absent (sauvegarde fusionnée) : la séance bouge quand même.
+    const orphan = { ...createSession("2026-10-14", null, "live"), planId: "missing" };
+    d.sessions.push(orphan);
+    moveSession(d, orphan.id, "2026-10-18");
+    expect(d.sessions[2].date).toBe("2026-10-18");
   });
 });
 

@@ -1,5 +1,6 @@
 import type { Activity } from "./activities";
 import { addDays, dayLabel, ddmm, type Lang, mondayOf } from "./dates";
+import type { ImportedDay } from "./importer";
 import { type ExerciseEntry, parseLine, splitExercises } from "./parse";
 import type { Template } from "./program";
 import { type Block, type Data, type PlanItem, type Session, uid } from "./store";
@@ -40,12 +41,40 @@ export function sessionLines(s: Session): string[] {
 export const hasTraining = (s: Session) => sessionLines(s).length > 0;
 export const isEmpty = (s: Session) => !hasTraining(s) && !s.activities.length && !s.note.trim();
 
-export function sessionsOn(data: Data, date: string): Session[] {
-  return data.sessions.filter((s) => s.date === date);
-}
-
 export function sessionsBetween(data: Data, from: string, to: string): Session[] {
   return data.sessions.filter((s) => s.date >= from && s.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Ouvre une séance en cours ; celles restées en cours sont terminées, ou retirées si elles sont vides. */
+export function beginSession(data: Data, s: Session): void {
+  data.sessions = data.sessions.filter((x) => x.status !== "live" || !isEmpty(x));
+  for (const x of data.sessions) if (x.status === "live") x.status = "done";
+  data.sessions.push(s);
+  data.activeId = s.id;
+}
+
+/** Change la date d'une séance ; son bloc planifié la suit. */
+export function moveSession(data: Data, id: string, date: string): void {
+  const s = data.sessions.find((x) => x.id === id);
+  if (!s) return;
+  s.date = date;
+  const p = s.planId ? data.plan.find((x) => x.id === s.planId) : undefined;
+  if (p) p.date = date;
+}
+
+export type ImportChoice = "add" | "replace" | "skip";
+
+/** Enregistre les journées importées. Les dates à remplacer sont vidées avant tout ajout, pour garder plusieurs journées d'une même date. */
+export function applyImport(data: Data, days: ImportedDay[], choices: ImportChoice[]): number {
+  const replaced = new Set(days.filter((_, i) => choices[i] === "replace").map((d) => d.date));
+  data.sessions = data.sessions.filter((s) => !replaced.has(s.date) || s.status === "live");
+  let added = 0;
+  days.forEach((day, i) => {
+    if (choices[i] === "skip") return;
+    data.sessions.push({ ...createSession(day.date, null, "import"), title: day.title, lines: day.lines, activities: day.activities, note: day.note });
+    added++;
+  });
+  return added;
 }
 
 /** Session du jour qui reçoit une activité ajoutée hors séance. */

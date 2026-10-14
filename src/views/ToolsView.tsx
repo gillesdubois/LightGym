@@ -5,7 +5,7 @@ import { copyText, downloadText, toast } from "../lib/device";
 import { useT } from "../lib/i18n";
 import { type ImportResult, parseImport } from "../lib/importer";
 import { EXAMPLE_PROGRAM, parseProgram } from "../lib/program";
-import { allMarkdown, buildPrompt, createSession, isEmpty, sessionLines, weekMarkdown } from "../lib/sessions";
+import { allMarkdown, applyImport, buildPrompt, type ImportChoice, isEmpty, sessionLines, weekMarkdown } from "../lib/sessions";
 import { type Data, type LangSetting, migrate, replaceAll, requestPersistence, uid, update } from "../lib/store";
 
 export type ToolSection = "bilan" | "import" | "programme" | "sauvegarde" | "reglages";
@@ -101,14 +101,12 @@ function Review({ data }: { data: Data }) {
 
 /* ---------- Import de masse ---------- */
 
-type Choice = "add" | "replace" | "skip";
-
 function Import({ data }: { data: Data }) {
   const t = useT();
   const im = t.tools.import;
   const [text, setText] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
-  const [choices, setChoices] = useState<Choice[]>([]);
+  const [choices, setChoices] = useState<ImportChoice[]>([]);
 
   const existingOn = (date: string) => data.sessions.filter((s) => s.date === date && !isEmpty(s));
 
@@ -134,26 +132,13 @@ function Import({ data }: { data: Data }) {
   const run = () => {
     if (!result) return;
     let added = 0;
-    update((d) => {
-      result.days.forEach((day, i) => {
-        const c = choices[i];
-        if (c === "skip") return;
-        if (c === "replace") d.sessions = d.sessions.filter((s) => s.date !== day.date || s.status === "live");
-        const s = createSession(day.date, null, "import");
-        s.title = day.title;
-        s.lines = day.lines;
-        s.activities = day.activities;
-        s.note = day.note;
-        d.sessions.push(s);
-        added++;
-      });
-    });
+    update((d) => { added = applyImport(d, result.days, choices); });
     toast(im.done(added));
     setResult(null);
     setText("");
   };
 
-  const counts = choices.reduce((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {} as Record<Choice, number>);
+  const counts = choices.reduce((m, c) => ({ ...m, [c]: (m[c] ?? 0) + 1 }), {} as Record<ImportChoice, number>);
   const toImport = (counts.add ?? 0) + (counts.replace ?? 0);
   const range = result?.days.length ? result.days.map((d) => d.date).sort() : [];
 
@@ -203,7 +188,7 @@ function Import({ data }: { data: Data }) {
                   </div>
                   <div className="row import-choice">
                     {ex.length > 0 && <span className="small">{im.existing(ex.length)}</span>}
-                    <select className="field sm" id={`choice-${i}`} aria-label={im.actionFor(dayLabel(d.date, t.lang))} value={choices[i]} onChange={(e) => setChoices(choices.map((c, j) => (j === i ? (e.target.value as Choice) : c)))}>
+                    <select className="field sm" id={`choice-${i}`} aria-label={im.actionFor(dayLabel(d.date, t.lang))} value={choices[i]} onChange={(e) => setChoices(choices.map((c, j) => (j === i ? (e.target.value as ImportChoice) : c)))}>
                       <option value="add">{ex.length ? im.addMore : im.add}</option>
                       {ex.length > 0 && <option value="replace">{im.replace}</option>}
                       <option value="skip">{im.skip}</option>

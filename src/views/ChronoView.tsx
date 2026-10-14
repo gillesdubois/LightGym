@@ -13,7 +13,7 @@ import {
 const R = 100;
 const C = 2 * Math.PI * R;
 
-const presetName = (t: Dict, p: Preset) => t.chrono.presets[p.id] ?? p.name;
+const presetName = (t: Dict, p: Preset) => t.chrono.presets[p.id];
 
 function presetLine(t: Dict, p: Preset) {
   if (p.stopwatch) return t.chrono.freeTime;

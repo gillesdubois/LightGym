@@ -6,7 +6,7 @@ import { dayLabel, isoWeek, todayISO } from "./lib/dates";
 import { keepScreenOn, releaseScreen, useToast, useWakeState } from "./lib/device";
 import { useT } from "./lib/i18n";
 import type { Template } from "./lib/program";
-import { createSession, isEmpty } from "./lib/sessions";
+import { beginSession, createSession } from "./lib/sessions";
 import { getSaveFailed, update, useData } from "./lib/store";
 import CalendarView from "./views/CalendarView";
 import ChronoView from "./views/ChronoView";
@@ -67,16 +67,7 @@ export default function App() {
 
   const startSession: Nav["startSession"] = useCallback((date, template, planId) => {
     const s = createSession(date, template, "live", planId);
-    update((d) => {
-      // Une séance en cours restée vide est remplacée plutôt que gardée.
-      const prev = d.sessions.find((x) => x.id === d.activeId);
-      if (prev && prev.status === "live") {
-        if (isEmpty(prev)) d.sessions = d.sessions.filter((x) => x.id !== prev.id);
-        else prev.status = "done";
-      }
-      d.sessions.push(s);
-      d.activeId = s.id;
-    });
+    update((d) => beginSession(d, s));
     void keepScreenOn();
     go("seance");
   }, [go]);

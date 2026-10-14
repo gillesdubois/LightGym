@@ -8,7 +8,7 @@ import { movePlan, removePlan } from "../lib/sessions";
 import { type PlanItem, update } from "../lib/store";
 
 /** Un bloc planifié : on le consulte, on le démarre, on le déplace ou on le retire. */
-export default function PlanCard({ item, template, nav, compact = false }: { item: PlanItem; template: Template | undefined; nav: Nav; compact?: boolean }) {
+export default function PlanCard({ item, template, nav }: { item: PlanItem; template: Template | undefined; nav: Nav }) {
   const t = useT();
   const [moving, setMoving] = useState(false);
   const [moveDate, setMoveDate] = useState(item.date);
@@ -21,7 +21,7 @@ export default function PlanCard({ item, template, nav, compact = false }: { ite
     .join(" · ");
 
   return (
-    <div className={`plan-card ${compact ? "compact" : ""}`}>
+    <div className="plan-card">
       <button
         type="button"
         className="plan-main"
@@ -29,9 +29,9 @@ export default function PlanCard({ item, template, nav, compact = false }: { ite
         onClick={() => template && nav.preview({ templateId: template.id, date: item.date, planId: item.id })}
       >
         <b>{title}</b>
-        {!compact && (template
+        {template
           ? summary && summary !== title && <span className="small">{summary}</span>
-          : <span className="small">{t.plan.missing}</span>)}
+          : <span className="small">{t.plan.missing}</span>}
       </button>
       {moving ? (
         <div className="row nowrap">

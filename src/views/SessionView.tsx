@@ -8,7 +8,7 @@ import { beep, releaseScreen, toast, unlockAudio } from "../lib/device";
 import { type Dict, useT } from "../lib/i18n";
 import { parseLine, parseTarget, parseValue } from "../lib/parse";
 import { type BlockDef, placeholderFor, timedSteps, timedTotal } from "../lib/program";
-import { isEmpty, pendingPlanOn } from "../lib/sessions";
+import { isEmpty, moveSession, pendingPlanOn } from "../lib/sessions";
 import { type Block, type Data, getData, type Session, update } from "../lib/store";
 import { cancelGuided, guided, startRest, stopRest } from "../lib/timers";
 
@@ -275,7 +275,7 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
               <input className="field" id="s-title" value={s.title} placeholder={t.session.titlePh} onChange={(e) => patch((x) => { x.title = e.target.value; })} />
             </label>
             <label className="lbl" htmlFor="s-date">{t.session.date}
-              <input className="field" id="s-date" type="date" value={s.date} onChange={(e) => e.target.value && patch((x) => { x.date = e.target.value; })} />
+              <input className="field" id="s-date" type="date" value={s.date} onChange={(e) => e.target.value && update((d) => moveSession(d, s.id, e.target.value))} />
             </label>
           </div>
         </details>
