@@ -21,20 +21,25 @@ Pull-ups +12kg 4x [5-6] : 6,5,4,4
 The app reads the exercise name, load, number of sets, target range and your results, and highlights the sets that reach the top of the range. It never rejects a line: anything it doesn't understand is kept as a note.
 
 <p align="center">
-  <img src="docs/screenshots/week.png" width="220" alt="Week view: done and planned sessions, cycling and running distance">
-  <img src="docs/screenshots/session.png" width="220" alt="Session in progress: supersets, logged sets and rest timer">
+  <img src="docs/screenshots/today.png" width="220" alt="Today view: blocks planned today and coming up">
+  <img src="docs/screenshots/session.png" width="220" alt="Session in progress: the current superset in focus, logged sets and rest timer">
   <img src="docs/screenshots/timer.png" width="220" alt="Jump rope interval timer, 60 s work / 20 s rest">
 </p>
 <p align="center">
-  <img src="docs/screenshots/calendar.png" width="220" alt="Monthly calendar of sessions and activities">
+  <img src="docs/screenshots/calendar.png" width="220" alt="Calendar with done sessions, activities and planned blocks">
   <img src="docs/screenshots/exercise.png" width="220" alt="Exercise history with its progress curve">
   <img src="docs/screenshots/import.png" width="220" alt="Notes import: preview of the recognised days">
 </p>
 
 ## What it does
 
+**Planning**
+- Your program is written as plain text. Each heading becomes a block: a strength session, yoga, a run.
+- You place blocks on the calendar, move them when your week shifts, repeat one over the week, or plan your typical week in one tap.
+- The Today screen shows what is planned today, what you've done and what comes next. Opening a block shows its content without starting anything.
+
 **During a session**
-- Your program, written as plain text, suggests each day's session: blocks, supersets, targets and rest times.
+- One block at a time: the current exercise stays in focus and the app moves to the next block once its sets are logged.
 - Logging a set starts the rest timer, with 3-2-1 beeps and a vibration at the end.
 - A hold timer measures a plank or a front lever and fills in the value for you.
 - "Bonus" blocks can be skipped with one tap when time runs short.
@@ -45,7 +50,7 @@ The app reads the exercise name, load, number of sets, target range and your res
 - Outside activities (cycling, running, hiking, climbing, yoga…) take two taps to add, with duration, distance and pace.
 
 **Afterwards**
-- A monthly calendar shows sessions, activities and distances.
+- The calendar shows done sessions, activities and distances alongside what is planned.
 - Each exercise has its own history and curve; supersets are split into their two exercises.
 - Bulk import takes weeks of notes pasted as they are, with a preview before anything is saved.
 - A week exports to Markdown (Obsidian-friendly), or to a review prompt ready to paste into an AI assistant, with your context, program and progress.
@@ -109,7 +114,7 @@ Superset B · bonus | 3 rounds | rest 1:30
 - Running : 3-4 km easy
 ```
 
-A heading that starts with a weekday suggests that session on that day. Without a weekday, the template is available any time. `core` marks a block you always do, `bonus` one you can skip, `skill` a technique block that gets the longer rest. An example program loads on first launch.
+Each heading is a block you can plan on any day. A heading that starts with a weekday is part of your typical week, which "Plan the typical week" places in one tap; you can still move those blocks afterwards. `core` marks a block you always do, `bonus` one you can skip, `skill` a technique block that gets the longer rest. An example program loads on first launch.
 
 ## Running the project
 
