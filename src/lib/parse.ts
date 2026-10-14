@@ -27,6 +27,8 @@ export interface ParsedLine {
   sets: number | null;
   targetTxt: string | null;
   target: Target | null;
+  /** Objectifs des deux exercices d'un superset. */
+  pairTargets: (Target | null)[] | null;
   values: Value[];
   note: string | null;
   free: boolean;
@@ -43,7 +45,17 @@ export function parseTarget(t: string | null | undefined): Target | null {
   return one ? { low: toNum(one[0]), high: toNum(one[0]) } : null;
 }
 
-export function parseValue(token: string, target: Target | null = null): Value | null {
+/** Classe une valeur par rapport à son objectif : haut de fourchette, sous l'objectif ou entre les deux. */
+function score(n: number, t: Target | null): "top" | "low" | "" | null {
+  if (!t) return null;
+  return n >= t.high ? "top" : n < t.low ? "low" : "";
+}
+
+/**
+ * Lit une valeur de série. `target` s'applique aux valeurs simples et aux deux côtés d'une paire ("4/4" par côté) ;
+ * `pairTargets` donne l'objectif de chaque exercice d'un superset ("8/15" pour [8-10 / 15]).
+ */
+export function parseValue(token: string, target: Target | null = null, pairTargets: (Target | null)[] | null = null): Value | null {
   const raw = token.trim();
   if (!raw) return null;
   const v: Value = { txt: raw, kind: "txt", side: null, cls: "" };
@@ -59,6 +71,10 @@ export function parseValue(token: string, target: Target | null = null): Value |
     v.kind = "pair";
     v.pair = [toNum(m[1]), toNum(m[3])];
     v.txt = `${m[1]}${m[2] ?? ""}/${m[3]}${m[4] ?? ""}`;
+    const scores = v.pair.map((n, i) => score(n, pairTargets ? pairTargets[i] ?? null : target));
+    if (scores.every((x) => x !== null)) {
+      v.cls = scores.every((x) => x === "top") ? "top" : scores.some((x) => x === "low") ? "low" : "";
+    }
   } else if ((m = rest.match(new RegExp(`^(${NUM})\\s*(s|sec|secs|secondes?|min|km|m|kg|reps?)?$`, "i")))) {
     v.kind = "num";
     v.num = toNum(m[1]);
@@ -67,14 +83,24 @@ export function parseValue(token: string, target: Target | null = null): Value |
     if (/^rep/.test(unit)) unit = "";
     v.unit = unit;
     v.txt = m[1] + unit;
-    if (target) {
-      if (v.num >= target.high) v.cls = "top";
-      else if (v.num < target.low) v.cls = "low";
-    }
+    v.cls = score(v.num, target) ?? "";
   } else {
     v.cls = "txt";
   }
   return v;
+}
+
+const UNIT_RE = /^(?:par\s+|per\s+)?(?:jambe|côté|cote|bras|leg|side|arm)s?$/i;
+
+/** "8-10 / 15" → ["8-10", "15"] ; "5-6 / jambe" reste un seul objectif. */
+export function splitTargets(t: string | null): string[] {
+  if (!t) return [];
+  const out: string[] = [];
+  for (const part of t.split(/\s*\/\s*/)) {
+    if (UNIT_RE.test(part.trim()) && out.length) out[out.length - 1] += ` / ${part.trim()}`;
+    else out.push(part.trim());
+  }
+  return out;
 }
 
 export function parseLine(line: string): ParsedLine | null {
@@ -82,7 +108,7 @@ export function parseLine(line: string): ParsedLine | null {
   if (!s) return null;
   const out: ParsedLine = {
     raw: s, name: s, left: s, load: null, sets: null, targetTxt: null,
-    target: null, values: [], note: null, free: false,
+    target: null, pairTargets: null, values: [], note: null, free: false,
   };
   const idx = s.indexOf(":");
   if (idx === -1) {
@@ -94,8 +120,9 @@ export function parseLine(line: string): ParsedLine | null {
   const t = left.match(/\[([^\]]+)\]/);
   if (t) {
     out.targetTxt = t[1].trim();
-    // Objectif de superset ("8-10 / 15") : pas de comparaison automatique.
-    out.target = /\//.test(out.targetTxt) && !/jambe|côté|cote|bras|leg|side|arm/i.test(out.targetTxt) ? null : parseTarget(out.targetTxt);
+    const targets = splitTargets(out.targetTxt);
+    if (targets.length === 2) out.pairTargets = targets.map(parseTarget);
+    else if (targets.length === 1) out.target = parseTarget(targets[0]);
     left = left.replace(t[0], " ");
   }
   const st = left.match(/(?:^|\s)(\d+)\s*[x×](?=\s|$)/i);
@@ -115,17 +142,17 @@ export function parseLine(line: string): ParsedLine | null {
   const parts = right.split(/\.\s+(?=\D)|\s+—\s+/);
   const vals = parts.shift() ?? "";
   if (parts.length) out.note = parts.join(". ").trim() || null;
-  out.values = vals.split(/[,;]/).map((x) => parseValue(x, out.target)).filter((x): x is Value => x !== null);
+  out.values = vals.split(/[,;]/).map((x) => parseValue(x, out.target, out.pairTargets)).filter((x): x is Value => x !== null);
   return out;
 }
 
-/** Toutes les séries numériques atteignent le haut de l'objectif. */
+/** Toutes les séries (valeurs simples ou paires de superset) atteignent le haut de l'objectif. */
 export function allAtTop(p: ParsedLine): boolean {
-  if (!p.target) return false;
-  const nums = p.values.filter((v) => v.kind === "num");
-  if (!nums.length) return false;
-  if (p.sets && nums.length < p.sets) return false;
-  return nums.every((v) => v.cls === "top");
+  if (!p.target && !p.pairTargets) return false;
+  const scored = p.values.filter((v) => v.kind === "num" || v.kind === "pair");
+  if (!scored.length) return false;
+  if (p.sets && scored.length < p.sets) return false;
+  return scored.every((v) => v.cls === "top");
 }
 
 export interface ExerciseEntry {
@@ -160,7 +187,7 @@ export function splitExercises(p: ParsedLine): ExerciseEntry[] {
   const segments = p.left.split(/\s+\/\s+/);
   const pairs = p.values.filter((v) => v.kind === "pair");
   if (segments.length === 2 && pairs.length && pairs.length >= p.values.length / 2) {
-    const targets = p.targetTxt ? p.targetTxt.split(/\s*\/\s*/) : [];
+    const targets = splitTargets(p.targetTxt);
     return segments.map((seg, i) => {
       const { name, load } = loadOf(seg);
       const target = targets.length === 2 ? parseTarget(targets[i]) : null;

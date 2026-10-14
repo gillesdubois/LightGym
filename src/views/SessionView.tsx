@@ -143,7 +143,8 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
       </section>
 
       {s.blocks.map((b) => {
-        const target1 = b.kind === "skill" || b.exos.length === 1 ? parseTarget(b.exos[0]?.target) : null;
+        const target1 = b.exos.length === 1 ? parseTarget(b.exos[0]?.target) : null;
+        const pairTargets = b.exos.length === 2 ? b.exos.map((e) => parseTarget(e.target)) : null;
         const ph = placeholderFor(b);
         const holdable = b.exos.length === 1 && /\d\s*s\b|sec/i.test(b.exos[0].target);
         const holdLeft = hold?.blockId === b.id ? (now - hold.start) / 1000 : null;
@@ -169,7 +170,7 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
                 <div className="row between">
                   <div className="chips">
                     {b.values.length ? b.values.map((v, i) => {
-                      const p = parseValue(v, target1);
+                      const p = parseValue(v, target1, pairTargets);
                       return p ? <Chip key={i} v={p} /> : null;
                     }) : <span className="small">{t.session.noSet}</span>}
                   </div>

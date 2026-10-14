@@ -37,6 +37,22 @@ describe("parseLine", () => {
     expect(allAtTop(parseLine("Dips 4x [5-6] : 6,6,6")!)).toBe(false);
   });
 
+  it("colore les supersets selon l'objectif de chaque exercice", () => {
+    const p = parseLine("Dips / Clean & press 20kg 4x [6-8 / 5] : 8/5, 8/5, 7/5, 5/5")!;
+    expect(p.values.map((v) => v.cls)).toEqual(["top", "top", "", "low"]);
+    expect(allAtTop(p)).toBe(false);
+    const all = parseLine("Tractions / Swing KB 20kg 4x [8-10 / 15] : 10/15, 10/15, 10/15, 10/15")!;
+    expect(allAtTop(all)).toBe(true);
+  });
+
+  it("garde un objectif par côté sur une seule valeur", () => {
+    const p = parseLine("One arm push-up 3x [3-5/côté] : 5/5, 4/4, 2/3")!;
+    expect(p.target).toEqual({ low: 3, high: 5 });
+    expect(p.values.map((v) => v.cls)).toEqual(["top", "", "low"]);
+    const archer = parseLine("Pompes archer / Swing 3x [6 par côté / 15] : 6/15, 6/14")!;
+    expect(archer.values.map((v) => v.cls)).toEqual(["top", "low"]);
+  });
+
   it("découpe un superset en deux exercices", () => {
     const p = parseLine("Tractions strictes / Swing KB 20kg 4x [8-10 / 15] : 10/15, 10/15, 8/15, 7/14")!;
     const [a, b] = splitExercises(p);
