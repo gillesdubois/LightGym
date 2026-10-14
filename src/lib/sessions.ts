@@ -25,6 +25,10 @@ export function sessionLines(s: Session): string[] {
   const out: string[] = [];
   for (const b of s.blocks) {
     if (!b.values.length) continue;
+    if (b.kind === "timed") {
+      out.push(`${b.label} : ${b.values.join(", ")}`);
+      continue;
+    }
     const name = b.exos.map((e) => e.name).join(" / ");
     const targets = b.exos.map((e) => e.target);
     const target = targets.some(Boolean) ? ` [${targets.join(" / ")}]` : "";

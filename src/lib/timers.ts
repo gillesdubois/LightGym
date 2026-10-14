@@ -132,6 +132,96 @@ export function completedRounds(): number {
   return Math.max(0, chrono.round - 1);
 }
 
+/* ---------- Minuteur guidé (blocs minutés : yoga, routine de mobilité) ---------- */
+
+export interface GuidedStep {
+  name: string;
+  cue?: string;
+  seconds: number;
+  /** Étape par côté : premier ou second côté. */
+  side?: "first" | "second";
+}
+
+export const guided = {
+  /** Bloc en cours ("sessionId:blockId"), null si aucun. */
+  key: null as string | null,
+  steps: [] as GuidedStep[],
+  /** -1 pendant la préparation. */
+  index: -1,
+  end: 0,
+  pausedLeft: null as number | null,
+  /** Début de la première étape et temps passé en pause, pour mesurer le temps réel. */
+  startedAt: 0,
+  pausedAt: 0,
+  pausedTotal: 0,
+  onDone: null as ((seconds: number) => void) | null,
+};
+
+export function startGuided(key: string, steps: GuidedStep[], onDone: (seconds: number) => void): void {
+  Object.assign(guided, {
+    key, steps, index: -1, end: Date.now() + PREP_SECONDS * 1000,
+    pausedLeft: null, startedAt: 0, pausedAt: 0, pausedTotal: 0, onDone,
+  });
+  beep(660, 0.1);
+  emit();
+}
+
+export function toggleGuided(): void {
+  if (!guided.key) return;
+  if (guided.pausedLeft !== null) {
+    guided.end = Date.now() + guided.pausedLeft;
+    guided.pausedLeft = null;
+    if (guided.pausedAt) guided.pausedTotal += Date.now() - guided.pausedAt;
+    guided.pausedAt = 0;
+  } else {
+    guided.pausedLeft = guided.end - Date.now();
+    guided.pausedAt = Date.now();
+  }
+  emit();
+}
+
+function enterStep(i: number, at: number): void {
+  guided.index = i;
+  if (i === 0 && !guided.startedAt) guided.startedAt = at;
+  guided.end = at + guided.steps[i].seconds * 1000;
+  // Bip double au changement de côté, bip simple au changement d'exercice.
+  if (guided.steps[i].side === "second") { beep(740, 0.12); setTimeout(() => beep(740, 0.12), 180); }
+  else beep(880, 0.3);
+  vibrate(120);
+}
+
+/** Saute à l'étape suivante (ou précédente) sans attendre la fin du temps. */
+export function jumpGuided(delta: 1 | -1): void {
+  if (!guided.key) return;
+  const next = Math.max(0, guided.index + delta);
+  if (next >= guided.steps.length) { finishGuided(); return; }
+  const paused = guided.pausedLeft !== null;
+  enterStep(next, Date.now());
+  if (paused) guided.pausedLeft = guided.end - Date.now();
+  emit();
+}
+
+/** Termine le bloc, au bout du temps ou plus tôt : enregistre le temps réellement passé. */
+export function finishGuided(): void {
+  if (!guided.key) return;
+  const now = Date.now();
+  const paused = guided.pausedAt ? now - guided.pausedAt : 0;
+  const spent = guided.startedAt ? Math.round((now - guided.startedAt - guided.pausedTotal - paused) / 1000) : 0;
+  const done = guided.onDone;
+  guided.key = null;
+  guided.onDone = null;
+  emit();
+  done?.(spent);
+}
+
+export function cancelGuided(): void {
+  guided.key = null;
+  guided.onDone = null;
+  emit();
+}
+
+export const guidedLeft = () => (guided.pausedLeft ?? guided.end - Date.now()) / 1000;
+
 /* ---------- Boucle ---------- */
 let lastWarn = "";
 function tick() {
@@ -195,6 +285,28 @@ function tick() {
     if (chrono.phase !== "done" && s > 0 && s <= 3 && key !== lastWarn) {
       lastWarn = key;
       beep(600, 0.07);
+    }
+  }
+
+  if (guided.key && guided.pausedLeft === null) {
+    changed = true;
+    while (guided.key && Date.now() >= guided.end) {
+      const next = guided.index + 1;
+      if (next >= guided.steps.length) {
+        beep(988, 0.7);
+        vibrate([300, 100, 300]);
+        finishGuided();
+        break;
+      }
+      enterStep(next, guided.end);
+    }
+    if (guided.key) {
+      const s = Math.ceil((guided.end - Date.now()) / 1000);
+      const key = `g${guided.index}:${s}`;
+      if (s > 0 && s <= 3 && key !== lastWarn) {
+        lastWarn = key;
+        beep(600, 0.07);
+      }
     }
   }
 

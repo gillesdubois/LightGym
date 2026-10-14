@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseDurationMin, parseDistanceKm, detectType } from "./activities";
 import { parseImport } from "./importer";
 import { allAtTop, parseLine, splitExercises } from "./parse";
-import { EXAMPLE_PROGRAM, parseProgram, placeholderFor } from "./program";
+import { EXAMPLE_PROGRAM, parseDuration, parseProgram, placeholderFor, timedTotal } from "./program";
 import { addPlan, buildPrompt, createSession, fillWeekFromProgram, movePlan, pendingPlanOn, removePlan, sessionLines, weekMarkdown } from "./sessions";
 import { migrate } from "./store";
 
@@ -346,5 +346,62 @@ describe("planning", () => {
     removePlan(d, p.id);
     expect(d.plan).toEqual([]);
     expect(d.sessions[0].planId).toBeUndefined();
+  });
+});
+
+describe("blocs minutés", () => {
+  const settings = { defaultRest: 90, skillRest: 150 };
+
+  it("lit les durées", () => {
+    expect(parseDuration("1:00")).toEqual({ seconds: 60, perSide: false });
+    expect(parseDuration("0:45 / côté")).toEqual({ seconds: 45, perSide: true });
+    expect(parseDuration("15 min")).toEqual({ seconds: 900, perSide: false });
+    expect(parseDuration("30 s / side")).toEqual({ seconds: 30, perSide: true });
+    expect(parseDuration("10-15 min")).toBeNull();
+    expect(parseDuration("8-10")).toBeNull();
+  });
+
+  it("enchaîne les lignes minutées en un bloc, avec leurs consignes", () => {
+    const text = `> Commentaire en tête, ignoré
+## Routine mobilité
+> Description du bloc, ignorée
+- Poignets : 1:00
+> En quadrupédie.
+- Chevilles : 0:45 / côté
+> Pied à 10 cm du mur.
+> Talon au sol.
+- Chat vache : 1:00
+
+## Yoga
+- Yoga : 15 min
+
+## Running
+- Running : 3-4 km, allure facile`;
+    const { templates, warnings } = parseProgram(text, settings);
+    expect(warnings).toEqual([]);
+    const [routine, yoga, run] = templates;
+    expect(routine.blocks).toHaveLength(1);
+    const b = routine.blocks[0];
+    expect(b).toMatchObject({ kind: "timed", label: "Routine mobilité", sets: 1, rest: 0 });
+    expect(b.exos.map((e) => [e.name, e.seconds, !!e.perSide])).toEqual([["Poignets", 60, false], ["Chevilles", 45, true], ["Chat vache", 60, false]]);
+    expect(b.exos[0].cue).toBe("En quadrupédie.");
+    expect(b.exos[1].cue).toBe("Pied à 10 cm du mur. Talon au sol.");
+    expect(timedTotal(b)).toBe(210);
+    expect(yoga.blocks[0]).toMatchObject({ kind: "timed", exos: [{ name: "Yoga", seconds: 900 }] });
+    expect(run.blocks[0].kind).toBe("single");
+  });
+
+  it("rend minuté un bloc avec en-tête dont toutes les lignes ont une durée", () => {
+    const { templates } = parseProgram("## Gainage\nCircuit | 3 tours\n- Planche : 0:45\n- Hollow : 0:30", settings);
+    expect(templates[0].blocks[0]).toMatchObject({ kind: "timed", sets: 1, rest: 0 });
+  });
+
+  it("écrit un bloc minuté sur une ligne", () => {
+    const { templates } = parseProgram("## Yoga\n- Yoga : 15 min", settings);
+    const s = createSession("2026-10-14", templates[0]);
+    s.blocks[0].values = ["12:40"];
+    expect(sessionLines(s)).toEqual(["Yoga : 12:40"]);
+    const v = parseLine("Yoga : 12:40")!.values[0];
+    expect([v.kind, v.num, v.txt]).toEqual(["num", 760, "12:40"]);
   });
 });

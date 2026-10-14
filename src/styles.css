@@ -499,3 +499,16 @@ pre.out {
 .blk-row.done { background: transparent; }
 .blk-row.done .blk-row-name { text-decoration: none; }
 .blk-row.skipped { opacity: 0.55; }
+
+/* ---------- Bloc minuté ---------- */
+.steps-list { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: 15px; }
+.steps-list li { padding-left: 2px; }
+.steps-list li > span:first-child { margin-right: 8px; }
+.pair .cue { flex-basis: 100%; }
+.guided { display: grid; gap: 10px; }
+.guided-name { font-family: var(--f-display); font-stretch: 80%; font-weight: 800; font-size: 26px; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere; }
+.guided-cue { color: var(--muted); font-size: 15px; }
+.guided-time { font-size: 64px; font-weight: 700; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; padding-block: 4px; }
+.guided-time.paused { color: var(--muted); }
+.guided-controls { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 8px; }
+.guided-controls .btn { padding-inline: 6px; }

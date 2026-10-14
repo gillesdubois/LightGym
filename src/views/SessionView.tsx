@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { Nav, Preview } from "../App";
 import { ActivityLine, Chip, Confirm, LineView, useNow, useTemplates } from "../components/common";
+import GuidedBlock from "../components/GuidedBlock";
 import PlanCard from "../components/PlanCard";
 import { DAYS, dayLabel, fmtClock, todayISO } from "../lib/dates";
 import { beep, releaseScreen, toast, unlockAudio } from "../lib/device";
 import { type Dict, useT } from "../lib/i18n";
 import { parseLine, parseTarget, parseValue } from "../lib/parse";
-import { type BlockDef, placeholderFor } from "../lib/program";
+import { type BlockDef, placeholderFor, timedSteps, timedTotal } from "../lib/program";
 import { isEmpty, pendingPlanOn } from "../lib/sessions";
-import { type Block, type Data, type Session, update } from "../lib/store";
-import { startRest, stopRest } from "../lib/timers";
+import { type Block, type Data, getData, type Session, update } from "../lib/store";
+import { cancelGuided, guided, startRest, stopRest } from "../lib/timers";
 
 export default function SessionView({ data, nav, session, preview, onBack }: {
   data: Data;
@@ -26,6 +27,7 @@ export default function SessionView({ data, nav, session, preview, onBack }: {
 /* ---------- Aperçu d'un bloc, sans rien démarrer ---------- */
 
 function blockMeta(t: Dict, b: BlockDef) {
+  if (b.kind === "timed") return `${t.session.guided.steps(timedSteps(b))} · ${t.session.guided.total(fmtClock(timedTotal(b)))}`;
   return [b.sets > 1 ? t.session.sets(b.sets) : null, b.rest ? t.session.rest(fmtClock(b.rest)) : null].filter(Boolean).join(" · ");
 }
 
@@ -51,7 +53,11 @@ function PreviewView({ data, nav, preview, onBack }: { data: Data; nav: Nav; pre
             </span>
           </div>
           {b.exos.map((e, j) => (
-            <div key={j} className="pair"><span>{e.name}</span>{e.target && <span className="target">{e.target}</span>}</div>
+            <div key={j} className="pair">
+              <span>{e.name}</span>
+              {e.target && <span className="target">{e.seconds ? `${fmtClock(e.seconds)}${e.perSide ? " ×2" : ""}` : e.target}</span>}
+              {e.cue && <span className="small cue">{e.cue}</span>}
+            </div>
           ))}
           {blockMeta(t, b) && <span className="small mono">{blockMeta(t, b)}</span>}
         </section>
@@ -211,7 +217,23 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
     }
   };
 
+  const stopGuidedHere = () => { if (guided.key?.startsWith(`${s.id}:`)) cancelGuided(); };
+
+  /** Fin d'un bloc minuté : on note le temps réel et on passe au bloc suivant. */
+  const completeTimed = (blockId: string) => (seconds: number) => {
+    if (seconds <= 0) return;
+    const value = fmtClock(seconds);
+    update((d) => {
+      const b = d.sessions.find((y) => y.id === s.id)?.blocks.find((y) => y.id === blockId);
+      if (b && !b.values.length) b.values.push(value);
+    });
+    toast(t.session.guided.recorded(value));
+    const fresh = getData().sessions.find((y) => y.id === s.id);
+    if (fresh) focus(nextOpen(fresh.blocks, fresh.blocks.findIndex((y) => y.id === blockId)));
+  };
+
   const finish = () => {
+    stopGuidedHere();
     update((d) => {
       const x = d.sessions.find((y) => y.id === s.id);
       if (x) x.status = "done";
@@ -280,9 +302,34 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
                 <span className="blk-label">{b.label}</span>
                 <span className="setcount">{b.skipped ? t.session.skipped : `${b.values.length}/${b.sets}`}</span>
               </span>
-              <span className="blk-row-name">{b.exos.map((e) => e.name).join(" / ")}</span>
+              <span className="blk-row-name">
+                {b.kind === "timed"
+                  ? `${t.session.guided.steps(timedSteps(b))} · ${fmtClock(timedTotal(b))}`
+                  : b.exos.map((e) => e.name).join(" / ")}
+              </span>
               {b.values.length > 0 && <span className="chips">{chips}</span>}
             </button>
+          );
+        }
+
+        if (b.kind === "timed") {
+          return (
+            <section key={b.id} ref={setRef} className="card blk focused" aria-current="step">
+              {b.values.length ? (
+                <>
+                  <span className="blk-label">{t.session.blockOf(i + 1, total)} · {b.label}</span>
+                  <div className="chips">{chips}</div>
+                  <button type="button" className="btn sm ghost start" onClick={() => patch((x) => { x.blocks.find((y) => y.id === b.id)!.values = []; })}>{t.session.undo}</button>
+                </>
+              ) : (
+                <GuidedBlock
+                  guidedKey={`${s.id}:${b.id}`}
+                  block={b}
+                  heading={`${t.session.blockOf(i + 1, total)} · ${b.label}`}
+                  onComplete={completeTimed(b.id)}
+                />
+              )}
+            </section>
           );
         }
 
@@ -392,6 +439,7 @@ function Editor({ data, nav, s }: { data: Data; nav: Nav; s: Session }) {
             ? <button type="button" className="btn primary" onClick={finish}>{t.session.finish}</button>
             : <button type="button" className="btn primary" onClick={close}>{t.session.close}</button>}
           <Confirm label={t.session.delete} confirmLabel={t.session.deleteConfirm} onConfirm={() => {
+            stopGuidedHere();
             update((d) => { d.sessions = d.sessions.filter((y) => y.id !== s.id); d.activeId = null; });
             stopRest();
             toast(t.session.deleted);

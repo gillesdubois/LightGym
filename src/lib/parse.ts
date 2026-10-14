@@ -75,6 +75,12 @@ export function parseValue(token: string, target: Target | null = null, pairTarg
     if (scores.every((x) => x !== null)) {
       v.cls = scores.every((x) => x === "top") ? "top" : scores.some((x) => x === "low") ? "low" : "";
     }
+  } else if ((m = rest.match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/))) {
+    // Durée m:ss ou h:mm:ss (bloc minuté) : comparée en secondes.
+    v.kind = "num";
+    v.num = (m[1] ? parseInt(m[1], 10) * 3600 : 0) + parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+    v.unit = "time";
+    v.txt = rest;
   } else if ((m = rest.match(new RegExp(`^(${NUM})\\s*(s|sec|secs|secondes?|min|km|m|kg|reps?)?$`, "i")))) {
     v.kind = "num";
     v.num = toNum(m[1]);

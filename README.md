@@ -42,6 +42,7 @@ The app reads the exercise name, load, number of sets, target range and your res
 - One block at a time: the current exercise stays in focus and the app moves to the next block once its sets are logged.
 - Logging a set starts the rest timer, with 3-2-1 beeps and a vibration at the end.
 - A hold timer measures a plank or a front lever and fills in the value for you.
+- Timed blocks (yoga, a mobility routine) run step by step on their own, with cues, side switches and the time actually spent logged at the end.
 - "Bonus" blocks can be skipped with one tap when time runs short.
 - The screen stays awake while you train, so you don't unlock your phone between sets.
 
@@ -112,6 +113,19 @@ Superset B · bonus | 3 rounds | rest 1:30
 
 ## Tuesday — Cardio
 - Running : 3-4 km easy
+```
+
+A line with a duration is a timed step. Consecutive timed lines form a guided block: the app runs each step on a timer, switches sides with a beep and shows your cue (a `>` line right below):
+
+```
+## Mobility routine
+- Wrists : 1:00
+> On all fours, rock forward and back.
+- Ankles, knee to wall : 0:45 / side
+> Foot 10 cm from the wall, heel down.
+
+## Yoga
+- Yoga : 15 min
 ```
 
 Each heading is a block you can plan on any day. A heading that starts with a weekday is part of your typical week, which "Plan the typical week" places in one tap; you can still move those blocks afterwards. `core` marks a block you always do, `bonus` one you can skip, `skill` a technique block that gets the longer rest. An example program loads on first launch.

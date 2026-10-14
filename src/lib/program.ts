@@ -12,12 +12,18 @@ import { DAY_NAME_PATTERN, dayIndexFromName, type Lang } from "./dates";
 export interface ExoDef {
   name: string;
   target: string;
+  /** Étape minutée ("1:00", "15 min", "45 s") : durée en secondes, éventuellement par côté. */
+  seconds?: number;
+  perSide?: boolean;
+  /** Consigne écrite sous la ligne avec "> ", affichée pendant l'étape. */
+  cue?: string;
 }
 
 export interface BlockDef {
   label: string;
   tag?: "core" | "bonus";
-  kind: "skill" | "superset" | "single";
+  /** "timed" : toutes les lignes ont une durée, le bloc se déroule au minuteur. */
+  kind: "skill" | "superset" | "single" | "timed";
   exos: ExoDef[];
   sets: number;
   rest: number;
@@ -53,6 +59,25 @@ function parseRest(text: string): number | null {
   return a <= 10 ? a * 60 : a;
 }
 
+const DURATION_RE = /^\s*(?:(\d+):(\d{2})|(\d+(?:[.,]\d+)?)\s*(min|mn|minutes?|s|sec|secs|secondes?|seconds?))\s*(?:\/\s*(?:côté|cote|side|jambe|leg)s?)?\s*$/i;
+
+/** "1:00" → 60, "15 min" → 900, "45 s / côté" → 45 (perSide). Une plage comme "10-15 min" n'est pas une durée. */
+export function parseDuration(target: string): { seconds: number; perSide: boolean } | null {
+  const m = target.match(DURATION_RE);
+  if (!m) return null;
+  const seconds = m[1] !== undefined
+    ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+    : Math.round(parseFloat(m[3].replace(",", ".")) * (/^s/i.test(m[4]) ? 1 : 60));
+  if (!seconds) return null;
+  return { seconds, perSide: /\//.test(target) };
+}
+
+/** Nombre d'étapes d'un bloc minuté, chaque côté comptant pour une étape. */
+export const timedSteps = (b: Pick<BlockDef, "exos">) => b.exos.reduce((n, e) => n + (e.perSide ? 2 : 1), 0);
+
+/** Durée totale d'un bloc minuté, côtés compris. */
+export const timedTotal = (b: Pick<BlockDef, "exos">) => b.exos.reduce((n, e) => n + (e.seconds ?? 0) * (e.perSide ? 2 : 1), 0);
+
 function slug(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -62,13 +87,21 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
   const warnings: ProgramWarning[] = [];
   let tpl: Template | null = null;
   let block: (BlockDef & { setsFixed: boolean; restFixed: boolean }) | null = null;
+  // Suite de lignes minutées sans en-tête de bloc : elles forment un seul bloc minuté.
+  let timedRun: BlockDef | null = null;
+  let lastExo: ExoDef | null = null;
 
   const closeBlock = () => {
     if (!tpl || !block) return;
     if (!block.exos.length) {
       warnings.push({ kind: "emptyBlock", block: block.label, template: tpl.name });
     } else {
-      if (block.kind !== "skill") block.kind = block.exos.length > 1 ? "superset" : "single";
+      if (block.exos.every((e) => e.seconds)) {
+        block.kind = "timed";
+        block.sets = 1;
+        block.rest = 0;
+        block.restFixed = true;
+      } else if (block.kind !== "skill") block.kind = block.exos.length > 1 ? "superset" : "single";
       if (!block.restFixed) block.rest = block.kind === "skill" ? settings.skillRest : settings.defaultRest;
       const { setsFixed: _s, restFixed: _r, ...def } = block;
       tpl.blocks.push(def);
@@ -78,11 +111,18 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
 
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
-    if (!line || line.startsWith(">") || line.startsWith("//")) continue;
+    // "> consigne" juste sous une ligne d'exercice ; ailleurs, c'est un commentaire.
+    if (line.startsWith(">")) {
+      if (lastExo) lastExo.cue = [lastExo.cue, line.replace(/^>\s*/, "")].filter(Boolean).join(" ");
+      continue;
+    }
+    if (!line || line.startsWith("//")) continue;
 
     const head = line.match(/^#{2,3}\s+(.+)$/);
     if (head) {
       closeBlock();
+      timedRun = null;
+      lastExo = null;
       const name = head[1].trim();
       const dm = name.match(DAY_HEAD_RE);
       const wd = dm ? dayIndexFromName(dm[1]) : null;
@@ -119,6 +159,19 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
         target = r.join(":").trim();
       }
       const name = t.replace(/\s{2,}/g, " ").trim();
+      const dur = parseDuration(target);
+      const exo: ExoDef = dur ? { name, target, seconds: dur.seconds, perSide: dur.perSide } : { name, target };
+      lastExo = exo;
+      if (!block && dur) {
+        // Ligne minutée hors bloc : elle rejoint la suite minutée en cours ou en ouvre une.
+        if (!timedRun || tpl.blocks[tpl.blocks.length - 1] !== timedRun) {
+          timedRun = { label: tpl.title, kind: "timed", exos: [], sets: 1, rest: 0 };
+          tpl.blocks.push(timedRun);
+        }
+        timedRun.exos.push(exo);
+        continue;
+      }
+      timedRun = null;
       // Sans en-tête de bloc, chaque puce est son propre bloc, sans repos.
       const standalone = !block;
       if (!block) {
@@ -128,13 +181,15 @@ export function parseProgram(text: string, settings: ProgramSettings): { templat
         block.sets = sets;
         block.setsFixed = true;
       }
-      block.exos.push({ name, target });
+      block.exos.push(exo);
       if (standalone) closeBlock();
       continue;
     }
 
     // En-tête de bloc.
     closeBlock();
+    timedRun = null;
+    lastExo = null;
     const parts = line.split("|").map((p) => p.trim());
     const tag: BlockDef["tag"] = /\b(?:bonus|optional|optionnel)\b/i.test(line) ? "bonus" : /\b(?:noyau|core)\b/i.test(line) ? "core" : undefined;
     const label = parts[0].replace(new RegExp(String.raw`\s*[·•(-]?\s*\(?\b(?:${TAG_WORDS})\b\)?\s*$`, "i"), "").trim() || parts[0];

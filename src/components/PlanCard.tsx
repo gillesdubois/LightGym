@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { Nav } from "../App";
-import { dayLabel } from "../lib/dates";
+import { dayLabel, fmtClock } from "../lib/dates";
 import { toast } from "../lib/device";
 import { useT } from "../lib/i18n";
-import type { Template } from "../lib/program";
+import { type Template, timedSteps, timedTotal } from "../lib/program";
 import { movePlan, removePlan } from "../lib/sessions";
 import { type PlanItem, update } from "../lib/store";
 
@@ -14,7 +14,11 @@ export default function PlanCard({ item, template, nav, compact = false }: { ite
   const [moveDate, setMoveDate] = useState(item.date);
   const title = template?.title ?? item.title;
   const core = template?.blocks.filter((b) => b.tag !== "bonus") ?? [];
-  const summary = core.map((b) => b.exos.map((e) => e.name).join(" / ")).join(" · ");
+  const summary = core
+    .map((b) => (b.kind === "timed"
+      ? `${t.session.guided.steps(timedSteps(b))} · ${fmtClock(timedTotal(b))}`
+      : b.exos.map((e) => e.name).join(" / ")))
+    .join(" · ");
 
   return (
     <div className={`plan-card ${compact ? "compact" : ""}`}>
