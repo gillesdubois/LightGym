@@ -49,6 +49,8 @@ export interface Data {
   plan: PlanItem[];
   programText: string;
   context: string;
+  /** Demande du prompt de bilan ; null = demande par défaut dans la langue de l'interface. */
+  question: string | null;
   settings: Settings;
   activeId: string | null;
 }
@@ -63,6 +65,7 @@ const emptyData = (): Data => ({
   plan: [],
   programText: "",
   context: "",
+  question: null,
   settings: { ...DEFAULT_SETTINGS },
   activeId: null,
 });
@@ -108,6 +111,7 @@ export function migrate(raw: unknown): Data {
       .map((p) => ({ id: p.id || uid(), date: p.date!, templateId: p.templateId!, title: p.title ?? "" })),
     programText: typeof d.programText === "string" ? d.programText : base.programText,
     context: typeof d.context === "string" ? d.context : base.context,
+    question: typeof d.question === "string" ? d.question : null,
     settings: { ...base.settings, ...(d.settings ?? {}) },
     activeId: d.activeId ?? null,
   };

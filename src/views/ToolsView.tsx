@@ -38,8 +38,7 @@ function Review({ data }: { data: Data }) {
   const [monday, setMonday] = useState(mondayOf(todayISO()));
   const [mode, setMode] = useState<"prompt" | "md">("prompt");
   const [opts, setOpts] = useState({ context: true, program: true, trends: true, week: true });
-  const [question, setQuestion] = useState<string | null>(null);
-  const q = question ?? r.defaultQuestion;
+  const q = data.question ?? r.defaultQuestion;
 
   const text = mode === "md" ? weekMarkdown(data, monday, t.lang) : buildPrompt(data, { monday, ...opts, question: q, lang: t.lang });
   const copy = async () => toast((await copyText(text)) ? t.common.copied : t.common.copyFailed);
@@ -73,7 +72,7 @@ function Review({ data }: { data: Data }) {
             ))}
           </div>
           <label className="lbl" htmlFor="question">{r.request}
-            <textarea className="field" id="question" value={q} onChange={(e) => setQuestion(e.target.value)} />
+            <textarea className="field" id="question" value={q} onChange={(e) => update((d) => { d.question = e.target.value; })} />
           </label>
           <details>
             <summary>{r.contextTitle}</summary>

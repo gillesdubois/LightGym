@@ -350,6 +350,12 @@ describe("planning", () => {
 });
 
 describe("non-régression", () => {
+  it("conserve la demande du prompt de bilan", () => {
+    expect(migrate({}).question).toBeNull();
+    expect(migrate({ question: "" }).question).toBe("");
+    expect(migrate(JSON.parse(JSON.stringify(migrate({ question: "Bilan court" })))).question).toBe("Bilan court");
+  });
+
   it("remplace une date sans effacer une autre journée du même import", () => {
     const d = migrate({ sessions: [{ id: "old", date: "2026-10-05", source: "import", lines: ["Tractions 4x : 5,5,5,5"] }] });
     const { days } = parseImport("# Semaine du 05/10/2026\n## Lun 05/10 — Matin\n* Tractions 4x : 6,6,6,6\n## Lun 05/10 — Soir\n* Pompes 3x : 20,20,20", id);
